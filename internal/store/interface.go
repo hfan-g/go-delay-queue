@@ -5,5 +5,6 @@ import (
 )
 
 type Store interface {
-	AddTask(task model.Task) error
+	CreateTask(task *model.Task) error
+	GetReadyTasks() []*model.Task
 }

@@ -2,12 +2,13 @@ package wheel
 
 import (
 	"container/list"
+	"sync"
 	"time"
 )
 
 // 任务接口，让时间轮不直接依赖具体Task结构
-type TaskInterface interface {
-	ExecuteAt() time.Time
+type ScheduleTask interface {
+	GetExecuteAt() time.Time
 	SetExecuteAt(time.Time)
 }
 
@@ -21,7 +22,8 @@ type Wheel struct {
 	tickCount	int
 	slots 		[]*slot
 	currentPos 	int
-	addTaskChan	chan TaskInterface
+	addTaskChan	chan ScheduleTask
+	wg	sync.WaitGroup
 }
 
 
@@ -31,7 +33,7 @@ func NewWheel(tickDuration time.Duration, tickCount int) *Wheel {
 		tickCount: tickCount,
 		slots: make([]*slot, tickCount),
 		currentPos: 0,
-		addTaskChan: make(chan TaskInterface, 1024),
+		addTaskChan: make(chan ScheduleTask, 1024),
 	}
 
 	for i := 0; i < tickCount; i++ {
@@ -48,7 +50,31 @@ func (w *Wheel) getPosition(executeAt time.Time) int {
 	return (w.currentPos + setps) % w.tickCount
 }
 
+func (w *Wheel) AddTask(task ScheduleTask) error {
+	pos := w.getPosition(task.GetExecuteAt())
+	if pos <= 0 {
 
+	}
+
+	w.slots[pos].tasks.PushBack(task)
+	return nil
+}
+
+func (w *Wheel) Start() {
+	ticker := time.NewTicker(w.tickDuration)
+	w.wg.Add(1)
+	go func() {
+		defer tw.wg.Done()
+		for {
+			select {
+			case <-ticker.C:
+				w.tick()
+			case
+				return
+			}
+		}
+	}
+}
 
 
 

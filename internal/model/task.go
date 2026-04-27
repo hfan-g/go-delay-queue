@@ -23,3 +23,11 @@ type Task struct {
     Status      TaskStatus  `json:"status"`
     CreatedAt   time.Time   `json:"created_at"`
 }
+
+func (t *Task) GetExecuteAt() time.Time {
+    return t.ExecuteAt
+}
+
+func (t *Task) SetExecuteAt(executeAt time.Time) {
+    t.ExecuteAt = executeAt
+}
