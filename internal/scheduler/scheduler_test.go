@@ -125,5 +125,5 @@ func TestScheduler_TimingWheelTasks(t *testing.T) {
 		t.Fatalf("add task-3 failed: %v", err)
 	}
 
-	time.Sleep(15 * time.Second)
+	time.Sleep(10 * time.Second)
 }

@@ -22,6 +22,7 @@ func NewTimingWheel(layers []LayerConfig, callback func(task ScheduleTask)) *Tim
 	tw := &TimingWheel{
 		quit:        make(chan struct{}),
 		addTaskChan: make(chan ScheduleTask, 1024),
+		onTaskExpired: callback,
 	}
 	tw.ticker = time.NewTicker(layers[0].TickDuration)
 	for _, layer := range layers {
@@ -88,6 +89,7 @@ func (tw *TimingWheel) addTask(task ScheduleTask) error {
 
 	if delay <= 0 {
 		tw.onTaskExpired(task)
+		return nil
 	}
 
 	if delay >= tw.wheelLayers[len(tw.wheelLayers)-1].totalSpan() {
