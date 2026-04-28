@@ -58,6 +58,21 @@ func (w *Wheel) AddTask(task ScheduleTask) error {
 	return nil
 }
 
+func (w *Wheel) addTask(task ScheduleTask) error {
+	pos := w.getPosition(task.GetExecuteAt())
+	if pos <= 0 {
+		return nil
+	}
+	fmt.Printf("插入id ID: %s \n", task.GetID())
+	w.slots[pos].tasks.PushBack(task)
+
+	return nil
+}
+
+func (w *Wheel) totalSpan() time.Duration {
+	return w.tickDuration * time.Duration(w.tickCount)
+}
+
 func (w *Wheel) Start() {
 	ticker := time.NewTicker(w.tickDuration)
 	w.wg.Add(1)
@@ -76,12 +91,7 @@ func (w *Wheel) Start() {
 				}
 				w.currentPos = (w.currentPos + 1) % w.tickCount
 			case task := <-w.addTaskChan:
-				pos := w.getPosition(task.GetExecuteAt())
-				if pos <= 0 {
-					continue
-				}
-				fmt.Printf("插入id ID: %s \n", task.GetID())
-				w.slots[pos].tasks.PushBack(task)
+				w.addTask(task)
 			}
 		}
 	}()
