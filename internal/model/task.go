@@ -31,3 +31,7 @@ func (t *Task) GetExecuteAt() time.Time {
 func (t *Task) SetExecuteAt(executeAt time.Time) {
     t.ExecuteAt = executeAt
 }
+
+func (t *Task) GetID() string {
+    return t.ID
+}

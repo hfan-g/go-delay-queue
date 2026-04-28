@@ -2,12 +2,14 @@ package wheel
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 	"time"
 )
 
 // 任务接口，让时间轮不直接依赖具体Task结构
 type ScheduleTask interface {
+	GetID() string
 	GetExecuteAt() time.Time
 	SetExecuteAt(time.Time)
 }
@@ -18,22 +20,23 @@ type slot struct {
 }
 
 type Wheel struct {
-	tickDuration time.Duration
-	tickCount	int
-	slots 		[]*slot
-	currentPos 	int
-	addTaskChan	chan ScheduleTask
-	wg	sync.WaitGroup
+	tickDuration  time.Duration
+	tickCount     int
+	slots         []*slot
+	currentPos    int
+	addTaskChan   chan ScheduleTask
+	wg            sync.WaitGroup
+	onTaskExpired func(task ScheduleTask)
 }
 
-
-func NewWheel(tickDuration time.Duration, tickCount int) *Wheel {
+func NewWheel(tickDuration time.Duration, tickCount int, callback func(ScheduleTask)) *Wheel {
 	w := &Wheel{
-		tickDuration: tickDuration,
-		tickCount: tickCount,
-		slots: make([]*slot, tickCount),
-		currentPos: 0,
-		addTaskChan: make(chan ScheduleTask, 1024),
+		tickDuration:  tickDuration,
+		tickCount:     tickCount,
+		slots:         make([]*slot, tickCount),
+		currentPos:    0,
+		addTaskChan:   make(chan ScheduleTask, 1024),
+		onTaskExpired: callback,
 	}
 
 	for i := 0; i < tickCount; i++ {
@@ -51,12 +54,7 @@ func (w *Wheel) getPosition(executeAt time.Time) int {
 }
 
 func (w *Wheel) AddTask(task ScheduleTask) error {
-	pos := w.getPosition(task.GetExecuteAt())
-	if pos <= 0 {
-
-	}
-
-	w.slots[pos].tasks.PushBack(task)
+	w.addTaskChan <- task
 	return nil
 }
 
@@ -64,17 +62,27 @@ func (w *Wheel) Start() {
 	ticker := time.NewTicker(w.tickDuration)
 	w.wg.Add(1)
 	go func() {
-		defer tw.wg.Done()
+		defer w.wg.Done()
 		for {
 			select {
 			case <-ticker.C:
-				w.tick()
-			case
-				return
+				slot := w.slots[w.currentPos]
+				for e := slot.tasks.Front(); e != nil; {
+					task := e.Value.(ScheduleTask)
+					w.onTaskExpired(task)
+					next := e.Next()
+					slot.tasks.Remove(e)
+					e = next
+				}
+				w.currentPos = (w.currentPos + 1) % w.tickCount
+			case task := <-w.addTaskChan:
+				pos := w.getPosition(task.GetExecuteAt())
+				if pos <= 0 {
+					continue
+				}
+				fmt.Printf("插入id ID: %s \n", task.GetID())
+				w.slots[pos].tasks.PushBack(task)
 			}
 		}
-	}
+	}()
 }
-
-
-

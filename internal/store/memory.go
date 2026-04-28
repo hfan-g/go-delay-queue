@@ -31,3 +31,11 @@ func (s *MemoryStore) GetReadyTasks() []*model.Task {
 	}
 	return readyTasks
 }
+
+func (s *MemoryStore) GetTask(id string) (*model.Task, error) {
+	task, ok := s.tasks[id]
+	if !ok {
+		return nil, fmt.Errorf("task not found")
+	}
+	return &task, nil
+}

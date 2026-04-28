@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"feng/delay-queue/internal/executor"
 	"feng/delay-queue/internal/model"
 	"feng/delay-queue/internal/store"
 	"feng/delay-queue/internal/wheel"
@@ -9,27 +8,34 @@ import (
 )
 
 type Scheduler struct {
-	store 	store.Store
-	tw  	*wheel.Wheel
-	executor *executor.Executor
+	Store store.Store
+	Tw    *wheel.Wheel
+}
+
+func NewScheduler(s store.Store, tw *wheel.Wheel) *Scheduler {
+	return &Scheduler{
+		Store: s,
+		Tw:    tw,
+	}
 }
 
 func (s *Scheduler) AddTask(t *model.Task) error {
-	if err := s.store.CreateTask(t); err != nil {
+	if err := s.Store.CreateTask(t); err != nil {
 		return err
 	}
-
-	if err := s.tw.AddTask(t); err != nil {
-		return err
-	}
+	s.Tw.AddTask(t)
 
 	return nil
 }
 
-func (s *Scheduler) onTaskExpired() error {
-	tasks := s.store.GetReadyTasks()
-	for _, task := range tasks {
-		fmt.Printf("Task %s expired: %s\n", task.ID, task.Payload)
+func (s *Scheduler) HandleExpiredTask(task wheel.ScheduleTask) {
+	id := task.GetID()
+
+	fullTask, err := s.Store.GetTask(id)
+	if err != nil {
+		fmt.Printf("gettask fail ID: %s", id)
+		return
 	}
-	return nil
+
+	fmt.Printf("Task %s expired: %s\n", fullTask.ID, fullTask.ExecuteAt)
 }
