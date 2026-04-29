@@ -62,13 +62,13 @@ func (s *Scheduler) Result() {
 				// 获取下次执行时间，默认5秒
 				t.ExecuteAt = time.Now().Add(5 * time.Second)
 				t.RetryCount++
-				s.RetryTask(t, t.ExecuteAt, t.RetryCount)
+				s.retryTask(t, t.ExecuteAt, t.RetryCount)
 			}
 		}
 	}()
 }
 
-func (s *Scheduler) RetryTask(t *model.Task, executeAt time.Time, retryCount int) error {
+func (s *Scheduler) retryTask(t *model.Task, executeAt time.Time, retryCount int) error {
 	err := s.Store.RequeueTask(t.ID, model.StatusProcessing, model.StatusPending, executeAt, retryCount)
 	if err != nil {
 		return fmt.Errorf("retry task fail, ID: %s", t.ID)

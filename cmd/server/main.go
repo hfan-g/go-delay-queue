@@ -2,13 +2,51 @@ package main
 
 import (
 	"feng/delay-queue/internal/api"
+	"feng/delay-queue/internal/executor"
+	"feng/delay-queue/internal/scheduler"
+	"feng/delay-queue/internal/store"
+	"feng/delay-queue/internal/wheel"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 func main() {
+	store := store.NewMemoryStore()
+	sched := &scheduler.Scheduler{Store: store} // 先部分初始化
 
-	http.HandleFunc("/task/add", api.AddTask)
+	// 定义回调，抓住 sched
+	callback := func(task wheel.ScheduleTask) {
+		sched.HandleExpiredTask(task)
+	}
+
+	layers := []wheel.LayerConfig{
+		{
+			TickDuration: 10 * time.Second,
+			TickCount:    60,
+		},
+		{
+			TickDuration: 100 * time.Minute,
+			TickCount:    60,
+		},
+		{
+			TickDuration: time.Hour,
+			TickCount:    24,
+		},
+	}
+	tw := wheel.NewTimingWheel(layers, callback)
+	sched.TimW = tw
+    sched.Executor = executor.NewExecutor(10)
+
+	// 启动时间轮
+	tw.Start()
+
+    //启动执行器
+    sched.Executor.Work()
+    sched.Result()
+
+	handels := api.NewHandel(sched)
+	http.HandleFunc("/task/add", handels.AddTask)
 	fmt.Print("service start!")
 	http.ListenAndServe(":8088", nil)
 }

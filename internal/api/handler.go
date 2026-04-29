@@ -3,19 +3,28 @@ package api
 import (
 	"encoding/json"
 	"feng/delay-queue/internal/model"
-	"feng/delay-queue/internal/store"
-	"fmt"
+	"feng/delay-queue/internal/scheduler"
 	"net/http"
 	"time"
 )
 
+type Handel struct {
+	s *scheduler.Scheduler
+}
+
 type APIResponse struct {
-	Code    int                    `json:"code"`
-	Message string                 `json:"message"`
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
 }
 
-func AddTask(w http.ResponseWriter, r *http.Request) {
+func NewHandel(s *scheduler.Scheduler) *Handel {
+	return &Handel{
+		s: s,
+	}
+}
+
+func (h *Handel) AddTask(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonResponse(w, http.StatusMethodNotAllowed, "Method not allowed", nil)
 		return
@@ -28,13 +37,11 @@ func AddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	executeAt, err := time.Parse(time.RFC3339, executeAtValue)
+	executeAt, err := time.ParseInLocation("2006-01-02 15:04:05", executeAtValue, time.Local)
 	if err != nil {
 		jsonResponse(w, http.StatusBadRequest, "Invalid execute_at format", nil)
 		return
 	}
-
-	fmt.Print(executeAt, "\n")
 
 	task := model.Task{
 		ID:          r.FormValue("id"),
@@ -42,13 +49,12 @@ func AddTask(w http.ResponseWriter, r *http.Request) {
 		Payload:     payload,
 		ExecuteAt:   executeAt,
 		Status:      model.StatusPending,
+		RetryCount:  0,
+		MaxRetry:    3,
+		CreatedAt:   time.Now(),
 	}
 
-	fmt.Print(task, "\n")
-
-	// 这里可以调用store.AddTask(task)将任务添加到存储中
-	memoryStore := store.NewMemoryStore() // 这里使用内存存储，实际应用中应该使用持久化存储
-	err = memoryStore.AddTask(task)
+	err = h.s.AddTask(&task)
 	if err != nil {
 		jsonResponse(w, http.StatusInternalServerError, "Failed to add task", nil)
 		return
@@ -67,6 +73,6 @@ func jsonResponse(w http.ResponseWriter, code int, message string, data interfac
 		Message: message,
 		Data:    data,
 	}
-	
+
 	json.NewEncoder(w).Encode(response)
 }

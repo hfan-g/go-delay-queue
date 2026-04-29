@@ -20,8 +20,8 @@ type TimingWheel struct {
 
 func NewTimingWheel(layers []LayerConfig, callback func(task ScheduleTask)) *TimingWheel {
 	tw := &TimingWheel{
-		quit:        make(chan struct{}),
-		addTaskChan: make(chan ScheduleTask, 1024),
+		quit:          make(chan struct{}),
+		addTaskChan:   make(chan ScheduleTask, 1024),
 		onTaskExpired: callback,
 	}
 	tw.ticker = time.NewTicker(layers[0].TickDuration)
@@ -86,8 +86,12 @@ func (tw *TimingWheel) advance(layerIndex int) {
 
 func (tw *TimingWheel) addTask(task ScheduleTask) error {
 	delay := time.Until(task.GetExecuteAt())
-
+	fmt.Println("当前时间:", time.Now())
+	fmt.Printf("add task ID: %s, delay: %s executeAt : %s\n", task.GetID(), delay, task.GetExecuteAt())
+	t := time.Now()           // 本地时区（系统设置）
+	fmt.Println(t.Location()) // 输出例如 "Local" 或 "Asia/Shanghai"
 	if delay <= 0 {
+		fmt.Printf("delay task ID: %s", task.GetID())
 		tw.onTaskExpired(task)
 		return nil
 	}
