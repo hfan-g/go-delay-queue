@@ -149,50 +149,56 @@ func TestScheduler_Executor(t *testing.T) {
 		},
 		{
 			TickDuration: time.Second,
-			TickCount:    10,
+			TickCount:    30,
 		},
 	}
 	tw := wheel.NewTimingWheel(layers, callback)
 	sched.TimW = tw
-    sched.Executor = executor.NewExecutor(10)
+	sched.Executor = executor.NewExecutor(10)
 
 	// 启动时间轮
 	tw.Start()
 
-    //启动执行器
-    sched.Executor.Work()
-    sched.Result()
+	//启动执行器
+	sched.Executor.Work()
+	sched.Result()
 
 	now := time.Now()
 	err := sched.AddTask(&model.Task{
-		ID:        "task-1",
-		Payload:   "hello-2s",
-        CallbackURL: "http://127.0.0.1:9501/api/order/1/cancel",
-		ExecuteAt: now.Add(1 * time.Second),
+		ID:          "task-1",
+		Payload:     "hello-2s",
+		CallbackURL: "http://127.0.0.1:9501/api/order/1/cancel",
+		ExecuteAt:   now.Add(1 * time.Second),
+		RetryCount:  0,
+		MaxRetry:    2,
 	})
 	if err != nil {
 		t.Fatalf("add task-1 failed: %v", err)
 	}
 
 	err = sched.AddTask(&model.Task{
-		ID:        "task-2",
-		Payload:   "hello-4s",
-        CallbackURL: "http://127.0.0.1:9501/api/order/2/cancel",
-		ExecuteAt: now.Add(2 * time.Second),
+		ID:          "task-2",
+		Payload:     "hello-4s",
+		CallbackURL: "http://127.0.0.1:9501/api/order/2/cancel",
+		ExecuteAt:   now.Add(2 * time.Second),
+		RetryCount:  0,
+		MaxRetry:    2,
 	})
 	if err != nil {
 		t.Fatalf("add task-2 failed: %v", err)
 	}
 
 	err = sched.AddTask(&model.Task{
-		ID:        "task-3",
-		Payload:   "hello-3s",
-        CallbackURL: "http://127.0.0.1:9501/api/order/3/cancel",
-		ExecuteAt: now.Add(20 * time.Second),
+		ID:          "task-3",
+		Payload:     "hello-3s",
+		CallbackURL: "http://127.0.0.1:9501/api/order/3/cancel",
+		ExecuteAt:   now.Add(20 * time.Second),
+		RetryCount:  0,
+		MaxRetry:    2,
 	})
 	if err != nil {
 		t.Fatalf("add task-3 failed: %v", err)
 	}
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(35 * time.Second)
 }

@@ -7,6 +7,7 @@ import (
 	"feng/delay-queue/internal/wheel"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type Scheduler struct {
@@ -21,6 +22,7 @@ func (s *Scheduler) AddTask(t *model.Task) error {
 		return err
 	}
 	s.TimW.AddTask(t)
+	s.Store.UpdateStatus(t.ID, model.StatusPending, model.StatusReady)
 
 	return nil
 }
@@ -34,7 +36,9 @@ func (s *Scheduler) HandleExpiredTask(task wheel.ScheduleTask) {
 		return
 	}
 
-	fmt.Printf("Task %s status: %d\n", fullTask.ID, fullTask.Status)
+	if err := s.Store.UpdateStatus(fullTask.ID, model.StatusReady, model.StatusProcessing); err != nil {
+		return
+	}
 
 	s.Executor.Sublimt(fullTask)
 }
@@ -44,10 +48,37 @@ func (s *Scheduler) Result() {
 		for {
 			res := s.Executor.GetResult()
 			if res.Code == http.StatusOK {
+				s.Store.UpdateStatus(res.TaskId, model.StatusProcessing, model.StatusSuccess)
 				fmt.Printf("执行成功 ID: %s \n", res.TaskId)
 			} else {
 				fmt.Printf("执行失败！ ID: %s \n", res.TaskId)
+
+				// 失败了查看重试次数, 如果超过了最大测试参数直接返回
+				t, _ := s.Store.GetTask(res.TaskId)
+				if t.RetryCount >= t.MaxRetry {
+					s.Store.UpdateStatus(res.TaskId, model.StatusProcessing, model.StatusDead)
+					continue
+				}
+				// 获取下次执行时间，默认5秒
+				t.ExecuteAt = time.Now().Add(5 * time.Second)
+				t.RetryCount++
+				s.RetryTask(t, t.ExecuteAt, t.RetryCount)
 			}
 		}
 	}()
+}
+
+func (s *Scheduler) RetryTask(t *model.Task, executeAt time.Time, retryCount int) error {
+	err := s.Store.RequeueTask(t.ID, model.StatusProcessing, model.StatusPending, executeAt, retryCount)
+	if err != nil {
+		return fmt.Errorf("retry task fail, ID: %s", t.ID)
+	}
+
+	err = s.TimW.AddTask(t)
+	if err != nil {
+		return fmt.Errorf("retry task fail, err: %s", err)
+	}
+	s.Store.UpdateStatus(t.ID, model.StatusPending, model.StatusReady)
+
+	return nil
 }
