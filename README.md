@@ -41,7 +41,7 @@ curl -X POST "http://localhost:8088/task/add" \
 | id | 是 | 任务唯一标识 |
 | callback_url | 是 | 回调地址（HTTP POST） |
 | payload | 是 | 透传参数（JSON 字符串） |
-| execute_at | 是 | 期望执行时间（格式：2006-01-02 15:04:05） |
+| execute_at | 是 | 期望执行时间戳（格式：1777545222） |
 
 ## 架构设计
 

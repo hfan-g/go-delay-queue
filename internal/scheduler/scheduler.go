@@ -68,6 +68,19 @@ func (s *Scheduler) Result() {
 	}()
 }
 
+func (s *Scheduler) Recover() {
+	tasks := s.Store.GetProcesingTasks()
+	for _, t := range tasks {
+		s.TimW.AddTask(t)
+	}
+
+	tasts := s.Store.GetReadyTasks()
+	for _, t := range tasts {
+		s.TimW.AddTask(t)
+	}
+}
+
+
 func (s *Scheduler) retryTask(t *model.Task, executeAt time.Time, retryCount int) error {
 	err := s.Store.RequeueTask(t.ID, model.StatusProcessing, model.StatusPending, executeAt, retryCount)
 	if err != nil {

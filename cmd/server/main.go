@@ -15,7 +15,7 @@ func main() {
 	store := store.NewMemoryStore()
 	sched := &scheduler.Scheduler{Store: store} // 先部分初始化
 
-	// 定义回调，抓住 sched
+	// 定义回调
 	callback := func(task wheel.ScheduleTask) {
 		sched.HandleExpiredTask(task)
 	}
@@ -36,14 +36,16 @@ func main() {
 	}
 	tw := wheel.NewTimingWheel(layers, callback)
 	sched.TimW = tw
-    sched.Executor = executor.NewExecutor(10)
+	sched.Executor = executor.NewExecutor(10)
 
 	// 启动时间轮
-	tw.Start()
+	sched.TimW.Start()
 
-    //启动执行器
-    sched.Executor.Work()
-    sched.Result()
+	// 启动执行器
+	sched.Executor.Work()
+	sched.Result()
+	// 恢复数据
+	sched.Recover()
 
 	handels := api.NewHandel(sched)
 	http.HandleFunc("/task/add", handels.AddTask)

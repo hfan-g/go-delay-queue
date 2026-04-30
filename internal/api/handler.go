@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"feng/delay-queue/internal/model"
 	"feng/delay-queue/internal/scheduler"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -32,12 +34,18 @@ func (h *Handel) AddTask(w http.ResponseWriter, r *http.Request) {
 	callbackUrl := r.FormValue("callback_url")
 	payload := r.FormValue("payload")
 	executeAtValue := r.FormValue("execute_at")
-	if callbackUrl == "" || payload == "" || executeAtValue == "" {
+	executeAtUnix, err := strconv.ParseInt(executeAtValue, 10, 64)
+	if err != nil {
+		jsonResponse(w, http.StatusBadRequest, "execute_at 必须是有效的整数时间戳", nil)
+		return
+	}
+	if callbackUrl == "" || payload == "" {
 		jsonResponse(w, http.StatusBadRequest, "请求参数错误", nil)
 		return
 	}
 
-	executeAt, err := time.ParseInLocation("2006-01-02 15:04:05", executeAtValue, time.Local)
+	executeAt := time.Unix(int64(executeAtUnix), 0)
+	fmt.Printf("callbackUrl: %s, payload: %s, execAt: %s\n", callbackUrl, payload, executeAtValue)
 	if err != nil {
 		jsonResponse(w, http.StatusBadRequest, "Invalid execute_at format", nil)
 		return

@@ -19,19 +19,18 @@ func NewMemoryStore() Store {
 }
 
 func (s *MemoryStore) CreateTask(task *model.Task) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.tasks[task.ID] = *task
 	return nil
 }
 
 func (s *MemoryStore) GetReadyTasks() []*model.Task {
-	var readyTasks []*model.Task
-	for id, task := range s.tasks {
-		fmt.Printf("id: %s \n", id)
-		if !task.ExecuteAt.After(time.Now()) {
-			readyTasks = append(readyTasks, &task)
-		}
-	}
-	return readyTasks
+	return []*model.Task{} // 内存无法持久化
+}
+
+func (s *MemoryStore) GetProcesingTasks() []*model.Task {
+	return []*model.Task{} // 内存无法持久化
 }
 
 func (s *MemoryStore) GetTask(id string) (*model.Task, error) {
