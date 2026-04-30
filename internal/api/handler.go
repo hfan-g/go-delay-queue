@@ -64,7 +64,6 @@ func (h *Handel) AddTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func jsonResponse(w http.ResponseWriter, code int, message string, data interface{}) {
-	// 这里可以使用json.Marshal将data转换为JSON格式，并写入响应
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 

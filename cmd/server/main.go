@@ -22,11 +22,11 @@ func main() {
 
 	layers := []wheel.LayerConfig{
 		{
-			TickDuration: 10 * time.Second,
+			TickDuration: time.Second,
 			TickCount:    60,
 		},
 		{
-			TickDuration: 100 * time.Minute,
+			TickDuration: time.Minute,
 			TickCount:    60,
 		},
 		{
@@ -47,6 +47,6 @@ func main() {
 
 	handels := api.NewHandel(sched)
 	http.HandleFunc("/task/add", handels.AddTask)
-	fmt.Print("service start!")
+	fmt.Print("service start!\n")
 	http.ListenAndServe(":8088", nil)
 }

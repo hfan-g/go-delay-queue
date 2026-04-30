@@ -86,12 +86,7 @@ func (tw *TimingWheel) advance(layerIndex int) {
 
 func (tw *TimingWheel) addTask(task ScheduleTask) error {
 	delay := time.Until(task.GetExecuteAt())
-	fmt.Println("当前时间:", time.Now())
-	fmt.Printf("add task ID: %s, delay: %s executeAt : %s\n", task.GetID(), delay, task.GetExecuteAt())
-	t := time.Now()           // 本地时区（系统设置）
-	fmt.Println(t.Location()) // 输出例如 "Local" 或 "Asia/Shanghai"
 	if delay <= 0 {
-		fmt.Printf("delay task ID: %s", task.GetID())
 		tw.onTaskExpired(task)
 		return nil
 	}
