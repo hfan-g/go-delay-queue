@@ -7,6 +7,7 @@ import (
 	"feng/delay-queue/internal/wheel"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -15,6 +16,8 @@ type Scheduler struct {
 	Tw       *wheel.Wheel
 	TimW     *wheel.TimingWheel
 	Executor *executor.Executor
+	Wg       *sync.WaitGroup
+	StopChan chan struct{}
 }
 
 func (s *Scheduler) AddTask(t *model.Task) error {
@@ -44,28 +47,41 @@ func (s *Scheduler) HandleExpiredTask(task wheel.ScheduleTask) {
 }
 
 func (s *Scheduler) Result() {
+	s.Wg.Add(1)
 	go func() {
+		defer s.Wg.Done()
 		for {
-			res := s.Executor.GetResult()
-			if res.Code == http.StatusOK {
-				s.Store.UpdateStatus(res.TaskId, model.StatusProcessing, model.StatusSuccess)
-				fmt.Printf("执行成功 ID: %s \n", res.TaskId)
-			} else {
-				fmt.Printf("执行失败！ ID: %s \n", res.TaskId)
-
-				// 失败了查看重试次数, 如果超过了最大测试参数直接返回
-				t, _ := s.Store.GetTask(res.TaskId)
-				if t.RetryCount >= t.MaxRetry {
-					s.Store.UpdateStatus(res.TaskId, model.StatusProcessing, model.StatusDead)
+			select {
+			case res := <-s.Executor.GetResultChan():
+				if res == nil {
 					continue
 				}
-				// 获取下次执行时间，默认5秒
-				t.ExecuteAt = time.Now().Add(5 * time.Second)
-				t.RetryCount++
-				s.retryTask(t, t.ExecuteAt, t.RetryCount)
+				if res.Code == http.StatusOK {
+					s.Store.UpdateStatus(res.TaskId, model.StatusProcessing, model.StatusSuccess)
+					fmt.Printf("执行成功 ID: %s \n", res.TaskId)
+				} else {
+					fmt.Printf("执行失败！ ID: %s \n", res.TaskId)
+
+					// 失败了查看重试次数, 如果超过了最大测试参数直接返回
+					t, _ := s.Store.GetTask(res.TaskId)
+					if t.RetryCount >= t.MaxRetry {
+						s.Store.UpdateStatus(res.TaskId, model.StatusProcessing, model.StatusDead)
+						continue
+					}
+					// 获取下次执行时间，默认5秒
+					t.ExecuteAt = time.Now().Add(5 * time.Second)
+					t.RetryCount++
+					s.retryTask(t, t.ExecuteAt, t.RetryCount)
+				}
+			case <-s.StopChan:
+				return
 			}
 		}
 	}()
+}
+
+func (s *Scheduler) Stop() {
+	close(s.StopChan)
 }
 
 func (s *Scheduler) Recover() {
@@ -79,7 +95,6 @@ func (s *Scheduler) Recover() {
 		s.TimW.AddTask(t)
 	}
 }
-
 
 func (s *Scheduler) retryTask(t *model.Task, executeAt time.Time, retryCount int) error {
 	err := s.Store.RequeueTask(t.ID, model.StatusProcessing, model.StatusPending, executeAt, retryCount)

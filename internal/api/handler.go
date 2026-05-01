@@ -46,10 +46,6 @@ func (h *Handel) AddTask(w http.ResponseWriter, r *http.Request) {
 
 	executeAt := time.Unix(int64(executeAtUnix), 0)
 	fmt.Printf("callbackUrl: %s, payload: %s, execAt: %s\n", callbackUrl, payload, executeAtValue)
-	if err != nil {
-		jsonResponse(w, http.StatusBadRequest, "Invalid execute_at format", nil)
-		return
-	}
 
 	task := model.Task{
 		ID:          r.FormValue("id"),

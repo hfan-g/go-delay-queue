@@ -13,14 +13,14 @@ type LayerConfig struct {
 type TimingWheel struct {
 	ticker        *time.Ticker
 	wheelLayers   []*Wheel
-	quit          chan struct{}
+	stop          chan struct{}
 	onTaskExpired func(task ScheduleTask)
 	addTaskChan   chan ScheduleTask
 }
 
 func NewTimingWheel(layers []LayerConfig, callback func(task ScheduleTask)) *TimingWheel {
 	tw := &TimingWheel{
-		quit:          make(chan struct{}),
+		stop:          make(chan struct{}),
 		addTaskChan:   make(chan ScheduleTask, 1024),
 		onTaskExpired: callback,
 	}
@@ -44,12 +44,16 @@ func (tw *TimingWheel) Start() {
 				tw.tick()
 			case task := <-tw.addTaskChan:
 				tw.addTask(task)
-			case <-tw.quit:
+			case <-tw.stop:
+				close(tw.addTaskChan)
 				return
 			}
 		}
 	}()
+}
 
+func (tw *TimingWheel) Stop() {
+	close(tw.stop)
 }
 
 func (tw *TimingWheel) tick() {

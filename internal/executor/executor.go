@@ -22,14 +22,17 @@ type Executor struct {
 	taskChan   chan *model.Task
 	resultChan chan *result
 	poolNum    int
-	wg         sync.WaitGroup
+	wg         *sync.WaitGroup
+	stopChan   chan struct{}
 }
 
-func NewExecutor(poolNum int) *Executor {
+func NewExecutor(poolNum int, wg *sync.WaitGroup) *Executor {
 	return &Executor{
 		taskChan:   make(chan *model.Task, 1024),
 		resultChan: make(chan *result, 1024),
 		poolNum:    poolNum,
+		wg:         wg,
+		stopChan:   make(chan struct{}),
 	}
 }
 
@@ -38,26 +41,34 @@ func (e *Executor) Sublimt(t *model.Task) error {
 	return nil
 }
 
-func (e *Executor) GetResult() *result {
-	return <-e.resultChan
+func (e *Executor) GetResultChan() <-chan *result {
+	return e.resultChan
+}
+
+func (e *Executor) Stop() {
+	close(e.stopChan)
 }
 
 func (e *Executor) Work() {
 	for i := 0; i < e.poolNum; i++ {
-		e.worker()
+		e.wg.Add(1)
+		go e.worker()
 	}
 }
 
 func (e *Executor) worker() {
-	e.wg.Go(func() {
-		for {
-			task, ok := <-e.taskChan
+	defer e.wg.Done()
+	for {
+		select {
+		case task, ok := <-e.taskChan:
 			if !ok {
 				continue
 			}
 			e.execute(task)
+		case <-e.stopChan:
+			return
 		}
-	})
+	}
 }
 
 func (e *Executor) execute(t *model.Task) {
