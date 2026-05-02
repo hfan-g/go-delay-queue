@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"feng/delay-queue/internal/api"
 	"feng/delay-queue/internal/executor"
 	"feng/delay-queue/internal/scheduler"
@@ -17,8 +18,9 @@ import (
 
 func main() {
 	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
 	store := store.NewMemoryStore()
-	sched := &scheduler.Scheduler{Store: store, StopChan: make(chan struct{}), Wg: &wg} // 先部分初始化
+	sched := &scheduler.Scheduler{Store: store, Wg: &wg, Ctx: ctx} // 先部分初始化
 
 	// 定义回调
 	callback := func(task wheel.ScheduleTask) {
@@ -39,9 +41,9 @@ func main() {
 			TickCount:    24,
 		},
 	}
-	tw := wheel.NewTimingWheel(layers, callback)
+	tw := wheel.NewTimingWheel(ctx, layers, callback)
 	sched.TimW = tw
-	sched.Executor = executor.NewExecutor(10, &wg)
+	sched.Executor = executor.NewExecutor(ctx, 10, &wg)
 
 	// 启动时间轮
 	sched.TimW.Start()
@@ -65,9 +67,7 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
 	fmt.Printf("\n收到信号 %v，开始优雅退出...\n", sigCh)
-	sched.Executor.Stop()
-	sched.TimW.Stop()
-	sched.Stop()
+	cancel()
 	wg.Wait()
 	fmt.Println("所有任务处理完毕，退出")
 }

@@ -23,16 +23,16 @@ type Executor struct {
 	resultChan chan *result
 	poolNum    int
 	wg         *sync.WaitGroup
-	stopChan   chan struct{}
+	ctx        context.Context
 }
 
-func NewExecutor(poolNum int, wg *sync.WaitGroup) *Executor {
+func NewExecutor(ctx context.Context, poolNum int, wg *sync.WaitGroup) *Executor {
 	return &Executor{
 		taskChan:   make(chan *model.Task, 1024),
 		resultChan: make(chan *result, 1024),
 		poolNum:    poolNum,
 		wg:         wg,
-		stopChan:   make(chan struct{}),
+		ctx: ctx,
 	}
 }
 
@@ -43,10 +43,6 @@ func (e *Executor) Sublimt(t *model.Task) error {
 
 func (e *Executor) GetResultChan() <-chan *result {
 	return e.resultChan
-}
-
-func (e *Executor) Stop() {
-	close(e.stopChan)
 }
 
 func (e *Executor) Work() {
@@ -65,7 +61,7 @@ func (e *Executor) worker() {
 				continue
 			}
 			e.execute(task)
-		case <-e.stopChan:
+		case <-e.ctx.Done():
 			return
 		}
 	}

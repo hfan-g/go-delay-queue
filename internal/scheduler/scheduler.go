@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"feng/delay-queue/internal/executor"
 	"feng/delay-queue/internal/model"
 	"feng/delay-queue/internal/store"
@@ -17,7 +18,7 @@ type Scheduler struct {
 	TimW     *wheel.TimingWheel
 	Executor *executor.Executor
 	Wg       *sync.WaitGroup
-	StopChan chan struct{}
+	Ctx		context.Context
 }
 
 func (s *Scheduler) AddTask(t *model.Task) error {
@@ -73,15 +74,11 @@ func (s *Scheduler) Result() {
 					t.RetryCount++
 					s.retryTask(t, t.ExecuteAt, t.RetryCount)
 				}
-			case <-s.StopChan:
+			case <-s.Ctx.Done():
 				return
 			}
 		}
 	}()
-}
-
-func (s *Scheduler) Stop() {
-	close(s.StopChan)
 }
 
 func (s *Scheduler) Recover() {

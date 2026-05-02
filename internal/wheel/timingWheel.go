@@ -1,6 +1,7 @@
 package wheel
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
@@ -13,16 +14,16 @@ type LayerConfig struct {
 type TimingWheel struct {
 	ticker        *time.Ticker
 	wheelLayers   []*Wheel
-	stop          chan struct{}
 	onTaskExpired func(task ScheduleTask)
 	addTaskChan   chan ScheduleTask
+	ctx context.Context
 }
 
-func NewTimingWheel(layers []LayerConfig, callback func(task ScheduleTask)) *TimingWheel {
+func NewTimingWheel(ctx context.Context, layers []LayerConfig, callback func(task ScheduleTask)) *TimingWheel {
 	tw := &TimingWheel{
-		stop:          make(chan struct{}),
 		addTaskChan:   make(chan ScheduleTask, 1024),
 		onTaskExpired: callback,
+		ctx: ctx,
 	}
 	tw.ticker = time.NewTicker(layers[0].TickDuration)
 	for _, layer := range layers {
@@ -44,7 +45,7 @@ func (tw *TimingWheel) Start() {
 				tw.tick()
 			case task := <-tw.addTaskChan:
 				tw.addTask(task)
-			case <-tw.stop:
+			case <-tw.ctx.Done():
 				close(tw.addTaskChan)
 				return
 			}
@@ -52,9 +53,6 @@ func (tw *TimingWheel) Start() {
 	}()
 }
 
-func (tw *TimingWheel) Stop() {
-	close(tw.stop)
-}
 
 func (tw *TimingWheel) tick() {
 	l0 := tw.wheelLayers[0]
