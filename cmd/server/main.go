@@ -19,7 +19,7 @@ import (
 func main() {
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
-	store := store.NewMemoryStore()
+	store := store.NewRedisStore()
 	sched := &scheduler.Scheduler{Store: store, Wg: &wg, Ctx: ctx} // 先部分初始化
 
 	// 定义回调

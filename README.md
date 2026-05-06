@@ -43,12 +43,14 @@ curl -X POST "http://localhost:8088/task/add" \
 
 ### 参数说明
 
-| 参数 | 必填 | 说明 |
-|------|------|------|
-| id | 是 | 任务唯一标识 |
-| callback_url | 是 | 回调地址（HTTP POST） |
-| payload | 是 | 透传参数（JSON 字符串） |
-| execute_at | 是 | 期望执行时刻的 **Unix 秒时间戳**（例如 `1746099600`） |
+
+| 参数           | 必填  | 说明                                     |
+| ------------ | --- | -------------------------------------- |
+| id           | 是   | 任务唯一标识                                 |
+| callback_url | 是   | 回调地址（HTTP POST）                        |
+| payload      | 是   | 透传参数（JSON 字符串）                         |
+| execute_at   | 是   | 期望执行时刻的 **Unix 秒时间戳**（例如 `1746099600`） |
+
 
 当前时间轮配置下，**延迟超过约 24 小时**的任务在添加时会失败（见 `internal/wheel/timingWheel.go` 中对最大跨度的校验）。
 
@@ -72,15 +74,19 @@ flowchart TD
     M -->|已超限| N[更新状态: Dead]
 ```
 
+
+
 ### 核心组件
 
-| 组件 | 文件 | 说明 |
-|------|------|------|
-| API | internal/api/handler.go | HTTP 接口处理 |
-| Scheduler | internal/scheduler/scheduler.go | 任务调度与重试逻辑 |
-| TimingWheel | internal/wheel/timingWheel.go | 多层时间轮实现 |
-| Executor | internal/executor/executor.go | 工作池并发执行 |
-| Store | internal/store/memory.go | 内存任务存储 |
+
+| 组件          | 文件                              | 说明        |
+| ----------- | ------------------------------- | --------- |
+| API         | internal/api/handler.go         | HTTP 接口处理 |
+| Scheduler   | internal/scheduler/scheduler.go | 任务调度与重试逻辑 |
+| TimingWheel | internal/wheel/timingWheel.go   | 多层时间轮实现   |
+| Executor    | internal/executor/executor.go   | 工作池并发执行   |
+| Store       | internal/store/memory.go        | 内存任务存储    |
+
 
 ## 任务状态流转
 
@@ -97,26 +103,32 @@ stateDiagram-v2
     Dead --> [*]
 ```
 
+
+
 ### 状态说明
 
-| 状态 | 值 | 说明 |
-|------|-----|------|
-| Pending | 0 | 等待加入调度 |
-| Ready | 1 | 已加入时间轮，等待执行 |
-| Processing | 2 | 执行中 |
-| Success | 3 | 执行成功 |
-| Failure | 4 | 执行失败（待重试） |
-| Dead | 5 | 重试耗尽，需人工处理 |
+
+| 状态         | 值   | 说明          |
+| ---------- | --- | ----------- |
+| Pending    | 0   | 等待加入调度      |
+| Ready      | 1   | 已加入时间轮，等待执行 |
+| Processing | 2   | 执行中         |
+| Success    | 3   | 执行成功        |
+| Failure    | 4   | 执行失败（待重试）   |
+| Dead       | 5   | 重试耗尽，需人工处理  |
+
 
 ## 时间轮原理
 
 系统采用三层时间轮设计：
 
-| 层级 | 刻度间隔 | 槽数 | 总跨度 |
-|------|---------|------|-------|
-| 第 1 层 | 1 秒 | 60 | 1 分钟 |
-| 第 2 层 | 1 分钟 | 60 | 1 小时 |
-| 第 3 层 | 1 小时 | 24 | 1 天 |
+
+| 层级    | 刻度间隔 | 槽数  | 总跨度  |
+| ----- | ---- | --- | ---- |
+| 第 1 层 | 1 秒  | 60  | 1 分钟 |
+| 第 2 层 | 1 分钟 | 60  | 1 小时 |
+| 第 3 层 | 1 小时 | 24  | 1 天  |
+
 
 任务根据延迟时间自动分配到合适的层级：
 
