@@ -24,9 +24,11 @@ type RedisStore struct {
 func NewRedisStore() *RedisStore {
 	ctx := context.Background()
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "127.0.0.1:6379",
-		Password: "",
-		DB:       0,
+		Addr:         "127.0.0.1:6379",
+		Password:     "redispassword",
+		DB:           0,
+		PoolSize:     100,
+		MinIdleConns: 10,
 	})
 
 	pong, err := rdb.Ping(ctx).Result()
@@ -43,6 +45,14 @@ func NewRedisStore() *RedisStore {
 
 func (r *RedisStore) CreateTask(task *model.Task) error {
 	key := taskHashKey(task.ID)
+	exists, err := r.rdb.HExists(r.ctx, key, "id").Result()
+	if err != nil {
+		return err
+	}
+	if exists == true {
+		return fmt.Errorf("ID 已存在")
+	}
+
 	pipe := r.rdb.TxPipeline()
 	pipe.HSet(r.ctx, key, map[string]any{
 		"id":           task.ID,
@@ -54,10 +64,10 @@ func (r *RedisStore) CreateTask(task *model.Task) error {
 		"status":       int(task.Status),
 		"created_at":   task.CreatedAt,
 	})
-	key = taskStatusKey(int(task.Status))
-	pipe.SAdd(r.ctx, key, task.ID)
+	statusKey := taskStatusKey(int(task.Status))
+	pipe.SAdd(r.ctx, statusKey, task.ID)
 
-	_, err := pipe.Exec(r.ctx)
+	_, err = pipe.Exec(r.ctx)
 	return err
 }
 
@@ -113,22 +123,47 @@ func (r *RedisStore) GetTask(id string) (*model.Task, error) {
 
 func (r *RedisStore) GetReadyTasks() []*model.Task {
 	key := taskStatusKey(int(model.StatusReady))
-	ids, err:= r.rdb.SMembers(r.ctx, key).Result()
+	ids, err := r.rdb.SMembers(r.ctx, key).Result()
 	if err != nil {
-
+		return []*model.Task{}
 	}
 
 	if len(ids) == 0 {
 		return []*model.Task{}
 	}
+	var tasks []*model.Task
 	for _, id := range ids {
-		// key = 
+		task, err := r.GetTask(id)
+		if err != nil {
+			continue
+		}
+		tasks = append(tasks, task)
 	}
 
+	return tasks
 }
-func (r *RedisStore) GetProcesingTasks() []*model.Task {
 
-	return []*model.Task{}
+func (r *RedisStore) GetProcesingTasks() []*model.Task {
+	key := taskStatusKey(int(model.StatusProcessing))
+	ids, err := r.rdb.SMembers(r.ctx, key).Result()
+	if err != nil {
+		fmt.Println("GetProcesingTasks fail")
+		return []*model.Task{}
+	}
+
+	if len(ids) == 0 {
+		return []*model.Task{}
+	}
+	var tasks []*model.Task
+	for _, id := range ids {
+		task, err := r.GetTask(id)
+		if err != nil {
+			continue
+		}
+		tasks = append(tasks, task)
+	}
+
+	return tasks
 }
 func (r *RedisStore) UpdateStatus(id string, oldStatus model.TaskStatus, newStatus model.TaskStatus) error {
 	script := redis.NewScript(`

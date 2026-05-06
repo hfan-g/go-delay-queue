@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"feng/delay-queue/internal/model"
 	"feng/delay-queue/internal/scheduler"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -45,7 +44,6 @@ func (h *Handel) AddTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	executeAt := time.Unix(int64(executeAtUnix), 0)
-	fmt.Printf("callbackUrl: %s, payload: %s, execAt: %s\n", callbackUrl, payload, executeAtValue)
 
 	task := model.Task{
 		ID:          r.FormValue("id"),
