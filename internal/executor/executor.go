@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"feng/delay-queue/internal/config"
 	"feng/delay-queue/internal/model"
 	"io"
 	"net/http"
@@ -26,11 +27,11 @@ type Executor struct {
 	ctx        context.Context
 }
 
-func NewExecutor(ctx context.Context, poolNum int, wg *sync.WaitGroup) *Executor {
+func NewExecutor(ctx context.Context, cfg *config.ExecutorConfig, wg *sync.WaitGroup) *Executor {
 	return &Executor{
 		taskChan:   make(chan *model.Task, 1024),
 		resultChan: make(chan *result, 1024),
-		poolNum:    poolNum,
+		poolNum:    cfg.PoolNum,
 		wg:         wg,
 		ctx: ctx,
 	}

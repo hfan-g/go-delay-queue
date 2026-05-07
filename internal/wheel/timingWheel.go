@@ -7,8 +7,8 @@ import (
 )
 
 type LayerConfig struct {
-	TickDuration time.Duration
-	TickCount    int
+	TickDuration time.Duration `yaml:"tick_duration"`
+	TickCount    int           `yaml:"tick_count"`
 }
 
 type TimingWheel struct {

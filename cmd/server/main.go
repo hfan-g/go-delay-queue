@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"feng/delay-queue/internal/api"
+	"feng/delay-queue/internal/config"
 	"feng/delay-queue/internal/executor"
 	"feng/delay-queue/internal/scheduler"
 	"feng/delay-queue/internal/store"
@@ -13,37 +14,32 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 )
 
 func main() {
+	if err := config.InitConfig(); err != nil {
+        panic(fmt.Sprintf("初始化配置失败: %v", err))
+	}
+	cfg := config.GetConfig()
+
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
-	store := store.NewRedisStore()
-	sched := &scheduler.Scheduler{Store: store, Wg: &wg, Ctx: ctx} // 先部分初始化
+	store := store.NewRedisStore(&cfg.Redis)
+	sched := &scheduler.Scheduler{
+		Store: store,
+		Wg: &wg,
+		Ctx: ctx,
+		RetryInterval: cfg.Scheduler.RetryInterval,	
+	}
 
 	// 定义回调
 	callback := func(task wheel.ScheduleTask) {
 		sched.HandleExpiredTask(task)
 	}
 
-	layers := []wheel.LayerConfig{
-		{
-			TickDuration: time.Second,
-			TickCount:    60,
-		},
-		{
-			TickDuration: time.Minute,
-			TickCount:    60,
-		},
-		{
-			TickDuration: time.Hour,
-			TickCount:    24,
-		},
-	}
-	tw := wheel.NewTimingWheel(ctx, layers, callback)
+	tw := wheel.NewTimingWheel(ctx, cfg.Wheel.Layers, callback)
 	sched.TimW = tw
-	sched.Executor = executor.NewExecutor(ctx, 10, &wg)
+	sched.Executor = executor.NewExecutor(ctx, &cfg.Executor, &wg)
 
 	// 启动时间轮
 	sched.TimW.Start()
@@ -58,10 +54,10 @@ func main() {
 	http.HandleFunc("/task/add", handels.AddTask)
 
 	server := &http.Server{
-		Addr:         ":8088",
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:         cfg.HTTP.Addr,
+		ReadTimeout:  cfg.HTTP.ReadTimeout,
+		WriteTimeout: cfg.HTTP.WriteTimeout,
+		IdleTimeout:  cfg.HTTP.IdleTimeout,
 	}
 	go func() {
 		fmt.Print("service start!\n")

@@ -1,0 +1,27 @@
+http:
+  addr: ":8088"
+  read_timeout: 5s
+  write_timeout: 10s
+  idle_timeout: 120s
+
+redis:
+  addr: "localhost:6379"
+  password: "redispassword"
+  db: 0
+  pool_size: 10
+  min_idle_conns: 5
+
+executor:
+  pool_num: 10
+
+wheel:
+  layers:
+    - tick_count: 60
+      tick_duration: 1s
+    - tick_count: 60
+      tick_duration: 1m
+    - tick_count: 24
+      tick_duration: 1h
+
+scheduler:
+  retry_interval: 5s

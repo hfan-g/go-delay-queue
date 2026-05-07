@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"feng/delay-queue/internal/config"
 	"feng/delay-queue/internal/model"
 	"fmt"
 	"strconv"
@@ -19,14 +20,14 @@ type RedisStore struct {
 	rdb *redis.Client
 }
 
-func NewRedisStore() *RedisStore {
+func NewRedisStore(cfg *config.RedisConfig) *RedisStore {
 	ctx := context.Background()
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
-		Password:     "redispassword",
-		DB:           0,
-		PoolSize:     100,
-		MinIdleConns: 10,
+		Addr:         cfg.Addr,
+		Password:     cfg.Password,
+		DB:           cfg.DB,
+		PoolSize:     cfg.PoolSize,
+		MinIdleConns: cfg.MinIdleConns,
 	})
 
 	pong, err := rdb.Ping(ctx).Result()

@@ -13,12 +13,13 @@ import (
 )
 
 type Scheduler struct {
-	Store    store.Store
-	Tw       *wheel.Wheel
-	TimW     *wheel.TimingWheel
-	Executor *executor.Executor
-	Wg       *sync.WaitGroup
-	Ctx		context.Context
+	Store         store.Store
+	Tw            *wheel.Wheel
+	TimW          *wheel.TimingWheel
+	Executor      *executor.Executor
+	Wg            *sync.WaitGroup
+	Ctx           context.Context
+	RetryInterval time.Duration
 }
 
 func (s *Scheduler) AddTask(ctx context.Context, t *model.Task) error {
@@ -74,8 +75,7 @@ func (s *Scheduler) Result() {
 						s.Store.UpdateStatus(s.Ctx, res.TaskId, model.StatusProcessing, model.StatusDead)
 						continue
 					}
-					// 获取下次执行时间，默认5秒
-					t.ExecuteAt = time.Now().Add(5 * time.Second)
+					t.ExecuteAt = time.Now().Add(s.RetryInterval)
 					t.RetryCount++
 					s.retryTask(t, t.ExecuteAt, t.RetryCount)
 				}
