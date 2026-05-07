@@ -1,15 +1,16 @@
 package store
 
 import (
+	"context"
 	"feng/delay-queue/internal/model"
 	"time"
 )
 
 type Store interface {
-	CreateTask(task *model.Task) error
-	GetTask(id string) (*model.Task, error)
-	GetReadyTasks() []*model.Task
-	GetProcessingTasks() []*model.Task
-	UpdateStatus(id string, oldStatus model.TaskStatus, newStatus model.TaskStatus) error
-	RequeueTask(id string, oldStatus model.TaskStatus, newStatus model.TaskStatus, newExecAt time.Time, newRetryCount int) error
+	CreateTask(ctx context.Context, task *model.Task) error
+	GetTask(ctx context.Context, id string) (*model.Task, error)
+	GetReadyTasks(ctx context.Context, ) []*model.Task
+	GetProcessingTasks(ctx context.Context, ) []*model.Task
+	UpdateStatus(ctx context.Context, id string, oldStatus model.TaskStatus, newStatus model.TaskStatus) error
+	RequeueTask(ctx context.Context, id string, oldStatus model.TaskStatus, newStatus model.TaskStatus, newExecAt time.Time, newRetryCount int) error
 }

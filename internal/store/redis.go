@@ -17,7 +17,6 @@ const (
 
 type RedisStore struct {
 	rdb *redis.Client
-	ctx context.Context
 }
 
 func NewRedisStore() *RedisStore {
@@ -38,11 +37,10 @@ func NewRedisStore() *RedisStore {
 
 	return &RedisStore{
 		rdb: rdb,
-		ctx: ctx,
 	}
 }
 
-func (r *RedisStore) CreateTask(task *model.Task) error {
+func (r *RedisStore) CreateTask(ctx context.Context, task *model.Task) error {
 	script := redis.NewScript(`
 		local key = KEYS[1]
 		local statusKey = KEYS[2]
@@ -67,7 +65,7 @@ func (r *RedisStore) CreateTask(task *model.Task) error {
 	}
 	key := taskHashKey(task.ID)
 	statusKey := taskStatusKey(int(task.Status))
-	result, err := script.Run(r.ctx, r.rdb, []string{key, statusKey}, args...).Int()
+	result, err := script.Run(ctx, r.rdb, []string{key, statusKey}, args...).Int()
 	if err != nil {
 		return err
 	}
@@ -77,9 +75,9 @@ func (r *RedisStore) CreateTask(task *model.Task) error {
 	return nil
 }
 
-func (r *RedisStore) GetTask(id string) (*model.Task, error) {
+func (r *RedisStore) GetTask(ctx context.Context, id string) (*model.Task, error) {
 	key := taskHashKey(id)
-	raw, err := r.rdb.HGetAll(r.ctx, key).Result()
+	raw, err := r.rdb.HGetAll(ctx, key).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -91,9 +89,9 @@ func (r *RedisStore) GetTask(id string) (*model.Task, error) {
 	return parseTaskHash(raw)
 }
 
-func (r *RedisStore) GetReadyTasks() []*model.Task {
+func (r *RedisStore) GetReadyTasks(ctx context.Context) []*model.Task {
 	key := taskStatusKey(int(model.StatusReady))
-	ids, err := r.rdb.SMembers(r.ctx, key).Result()
+	ids, err := r.rdb.SMembers(ctx, key).Result()
 	if err != nil {
 		return []*model.Task{}
 	}
@@ -106,9 +104,9 @@ func (r *RedisStore) GetReadyTasks() []*model.Task {
 	cmds := make([]*redis.MapStringStringCmd, len(ids))
 
 	for i, id := range ids {
-		cmds[i] = pipe.HGetAll(r.ctx, taskHashKey(id))
+		cmds[i] = pipe.HGetAll(ctx, taskHashKey(id))
 	}
-	_, err = pipe.Exec(r.ctx)
+	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return []*model.Task{}
 	}
@@ -131,9 +129,9 @@ func (r *RedisStore) GetReadyTasks() []*model.Task {
 	return tasks
 }
 
-func (r *RedisStore) GetProcessingTasks() []*model.Task {
+func (r *RedisStore) GetProcessingTasks(ctx context.Context) []*model.Task {
 	key := taskStatusKey(int(model.StatusProcessing))
-	ids, err := r.rdb.SMembers(r.ctx, key).Result()
+	ids, err := r.rdb.SMembers(ctx, key).Result()
 	if err != nil {
 		fmt.Println("GetProcesingTasks fail")
 		return []*model.Task{}
@@ -147,9 +145,9 @@ func (r *RedisStore) GetProcessingTasks() []*model.Task {
 	cmds := make([]*redis.MapStringStringCmd, len(ids))
 
 	for i, id := range ids {
-		cmds[i] = pipe.HGetAll(r.ctx, taskHashKey(id))
+		cmds[i] = pipe.HGetAll(ctx, taskHashKey(id))
 	}
-	_, err = pipe.Exec(r.ctx)
+	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return []*model.Task{}
 	}
@@ -171,7 +169,7 @@ func (r *RedisStore) GetProcessingTasks() []*model.Task {
 
 	return tasks
 }
-func (r *RedisStore) UpdateStatus(id string, oldStatus model.TaskStatus, newStatus model.TaskStatus) error {
+func (r *RedisStore) UpdateStatus(ctx context.Context, id string, oldStatus model.TaskStatus, newStatus model.TaskStatus) error {
 	script := redis.NewScript(`
 		local key = KEYS[1]
 		local oldStatusKey = KEYS[2]
@@ -195,7 +193,7 @@ func (r *RedisStore) UpdateStatus(id string, oldStatus model.TaskStatus, newStat
 	oldStatusKey := taskStatusKey(int(oldStatus))
 	newStatusKey := taskStatusKey(int(newStatus))
 	result, err := script.Run(
-		r.ctx,
+		ctx,
 		r.rdb,
 		[]string{key, oldStatusKey, newStatusKey},
 		id,
@@ -215,6 +213,7 @@ func (r *RedisStore) UpdateStatus(id string, oldStatus model.TaskStatus, newStat
 	}
 }
 func (r *RedisStore) RequeueTask(
+	ctx context.Context,
 	id string,
 	oldStatus model.TaskStatus,
 	newStatus model.TaskStatus,
@@ -244,7 +243,7 @@ func (r *RedisStore) RequeueTask(
 	oldStatusKey := taskStatusKey(int(oldStatus))
 	newStatusKey := taskStatusKey(int(newStatus))
 	result, err := script.Run(
-		r.ctx,
+		ctx,
 		r.rdb,
 		[]string{key, oldStatusKey, newStatusKey},
 		id,

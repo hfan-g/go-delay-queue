@@ -57,9 +57,17 @@ func main() {
 	handels := api.NewHandel(sched)
 	http.HandleFunc("/task/add", handels.AddTask)
 
+	server := &http.Server{
+		Addr:         ":8088",
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
 	go func() {
 		fmt.Print("service start!\n")
-		http.ListenAndServe(":8088", nil)
+		if err := server.ListenAndServe(); err != nil {
+			fmt.Println("server error:", err)
+		}
 	}()
 
 	//监听退出信号

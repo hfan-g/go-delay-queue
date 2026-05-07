@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"feng/delay-queue/internal/model"
 	"fmt"
 	"sync"
@@ -18,22 +19,22 @@ func NewMemoryStore() Store {
 	}
 }
 
-func (s *MemoryStore) CreateTask(task *model.Task) error {
+func (s *MemoryStore) CreateTask(ctx context.Context, task *model.Task) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tasks[task.ID] = *task
 	return nil
 }
 
-func (s *MemoryStore) GetReadyTasks() []*model.Task {
+func (s *MemoryStore) GetReadyTasks(ctx context.Context) []*model.Task {
 	return []*model.Task{} // 内存无法持久化
 }
 
-func (s *MemoryStore) GetProcessingTasks() []*model.Task {
+func (s *MemoryStore) GetProcessingTasks(ctx context.Context) []*model.Task {
 	return []*model.Task{} // 内存无法持久化
 }
 
-func (s *MemoryStore) GetTask(id string) (*model.Task, error) {
+func (s *MemoryStore) GetTask(ctx context.Context, id string) (*model.Task, error) {
 	task, ok := s.tasks[id]
 	if !ok {
 		return nil, fmt.Errorf("task not found")
@@ -41,7 +42,7 @@ func (s *MemoryStore) GetTask(id string) (*model.Task, error) {
 	return &task, nil
 }
 
-func (s *MemoryStore) UpdateStatus(id string, oldStatus model.TaskStatus, newStatus model.TaskStatus) error {
+func (s *MemoryStore) UpdateStatus(ctx context.Context, id string, oldStatus model.TaskStatus, newStatus model.TaskStatus) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -59,6 +60,7 @@ func (s *MemoryStore) UpdateStatus(id string, oldStatus model.TaskStatus, newSta
 }
 
 func (s *MemoryStore) RequeueTask(
+	ctx context.Context,
 	id string,
 	oldStatus model.TaskStatus,
 	newStatus model.TaskStatus,

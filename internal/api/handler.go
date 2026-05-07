@@ -56,7 +56,7 @@ func (h *Handel) AddTask(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:   time.Now(),
 	}
 
-	err = h.s.AddTask(&task)
+	err = h.s.AddTask(r.Context(), &task)
 	if err != nil {
 		jsonResponse(w, http.StatusInternalServerError, "Failed to add task: " + err.Error(), nil)
 		return
