@@ -58,7 +58,7 @@ func (h *Handel) AddTask(w http.ResponseWriter, r *http.Request) {
 
 	err = h.s.AddTask(&task)
 	if err != nil {
-		jsonResponse(w, http.StatusInternalServerError, "Failed to add task", nil)
+		jsonResponse(w, http.StatusInternalServerError, "Failed to add task: " + err.Error(), nil)
 		return
 	}
 

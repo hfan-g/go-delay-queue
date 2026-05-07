@@ -29,7 +29,7 @@ func (s *MemoryStore) GetReadyTasks() []*model.Task {
 	return []*model.Task{} // 内存无法持久化
 }
 
-func (s *MemoryStore) GetProcesingTasks() []*model.Task {
+func (s *MemoryStore) GetProcessingTasks() []*model.Task {
 	return []*model.Task{} // 内存无法持久化
 }
 

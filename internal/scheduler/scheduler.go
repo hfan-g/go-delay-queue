@@ -83,7 +83,7 @@ func (s *Scheduler) Result() {
 }
 
 func (s *Scheduler) Recover() {
-	tasks := s.Store.GetProcesingTasks()
+	tasks := s.Store.GetProcessingTasks()
 	for _, t := range tasks {
 		s.TimW.AddTask(t)
 	}
