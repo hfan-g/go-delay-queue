@@ -33,7 +33,7 @@ func NewRedisStore(cfg *config.RedisConfig) *RedisStore {
 
 	pong, err := rdb.Ping(ctx).Result()
 	if err != nil {
-		panic(fmt.Sprintf("Redis 连接失败: %v", err))
+		panic("Redis 连接失败: " + err.Error())
 	}
 	logger.Get().Info("Redis 连接成功", "pong", pong)
 
@@ -95,6 +95,9 @@ func (r *RedisStore) GetReadyTasks(ctx context.Context) []*model.Task {
 	key := taskStatusKey(int(model.StatusReady))
 	ids, err := r.rdb.SMembers(ctx, key).Result()
 	if err != nil {
+		logger.Get().Error("redisStore GetReadyTasks smembers fail",
+			"error", err.Error(),
+		)
 		return []*model.Task{}
 	}
 
@@ -117,7 +120,10 @@ func (r *RedisStore) GetReadyTasks(ctx context.Context) []*model.Task {
 	for i, id := range ids {
 		data, err := cmds[i].Result()
 		if err != nil {
-			fmt.Printf("id %s error: %v\n", id, err)
+			logger.Get().Error("redisStore GetReadyTasks error",
+				"id", id,
+				"error", err.Error(),
+			)
 			continue
 		}
 		task, err := parseTaskHash(data)
@@ -138,7 +144,7 @@ func (r *RedisStore) GetProcessingTasks(ctx context.Context) []*model.Task {
 	key := taskStatusKey(int(model.StatusProcessing))
 	ids, err := r.rdb.SMembers(ctx, key).Result()
 	if err != nil {
-		logger.Get().Error("redisStore GetProcesingTasks smembers fail",
+		logger.Get().Error("redisStore GetProcessingTasks smembers fail",
 			"error", err.Error(),
 		)
 		return []*model.Task{}

@@ -38,7 +38,6 @@ func (s *Scheduler) HandleExpiredTask(task wheel.ScheduleTask) {
 
 	fullTask, err := s.Store.GetTask(s.Ctx, id)
 	if err != nil {
-		fmt.Println(err)
 		logger.Get().Error("get task fail",
 			"id", id,
 		)
