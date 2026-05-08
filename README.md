@@ -8,13 +8,32 @@
 - 内置重试机制，支持可配置的最大重试次数
 - 工作池并发执行，提高任务处理吞吐量
 - 任务状态全生命周期管理
+- **Redis 持久化存储**，服务重启后任务不丢失
+- **结构化日志**（JSON 格式），支持日志轮转
+- **配置文件支持**，所有参数可通过 `conf.yaml` 配置
 
 ## 技术栈
 
 - Go 1.25+
+- Redis (go-redis/v9)
 - 标准库 net/http
+- log/slog (Go 1.21+ 内置)
+- lumberjack (日志轮转)
 
 ## 快速开始
+
+### 配置文件
+
+服务启动前，编辑 `conf.yaml` 配置 Redis 连接：
+
+```yaml
+redis:
+  addr: "localhost:6379"
+  password: "your-password"
+  db: 0
+  pool_size: 10
+  min_idle_conns: 5
+```
 
 ### 运行服务
 
@@ -62,7 +81,7 @@ flowchart TD
     B --> C{参数校验}
     C -->|失败| D[返回错误]
     C -->|成功| E[Scheduler]
-    E --> F[Memory Store]
+    E --> F[Redis Store]
     E --> G[Timing Wheel]
     G -->|等待到期| H{时间轮Tick}
     H -->|到期| I[Executor Pool]
@@ -74,8 +93,6 @@ flowchart TD
     M -->|已超限| N[更新状态: Dead]
 ```
 
-
-
 ### 核心组件
 
 
@@ -85,8 +102,8 @@ flowchart TD
 | Scheduler   | internal/scheduler/scheduler.go | 任务调度与重试逻辑 |
 | TimingWheel | internal/wheel/timingWheel.go   | 多层时间轮实现   |
 | Executor    | internal/executor/executor.go   | 工作池并发执行   |
-| Store       | internal/store/memory.go        | 内存任务存储    |
-
+| RedisStore  | internal/store/redis.go        | Redis 持久化存储 |
+| Logger      | internal/logger/logger.go      | 结构化日志      |
 
 ## 任务状态流转
 
@@ -103,8 +120,6 @@ stateDiagram-v2
     Dead --> [*]
 ```
 
-
-
 ### 状态说明
 
 
@@ -117,7 +132,6 @@ stateDiagram-v2
 | Failure    | 4   | 执行失败（待重试）   |
 | Dead       | 5   | 重试耗尽，需人工处理  |
 
-
 ## 时间轮原理
 
 系统采用三层时间轮设计：
@@ -129,7 +143,6 @@ stateDiagram-v2
 | 第 2 层 | 1 分钟 | 60  | 1 小时 |
 | 第 3 层 | 1 小时 | 24  | 1 天  |
 
-
 任务根据延迟时间自动分配到合适的层级：
 
 - 延迟 < 1 分钟：进入第 1 层
@@ -139,6 +152,77 @@ stateDiagram-v2
 系统会找到第一个 totalSpan 大于延迟时间的层级，将任务放入该层级。
 
 当低层级时间轮转一圈后，将任务晋升到高层级。
+
+## 配置文件说明
+
+所有配置通过 `conf.yaml` 管理：
+
+```yaml
+# HTTP 服务配置
+http:
+  addr: ":8088"              # 服务地址
+  read_timeout: 5s           # 读取请求超时
+  write_timeout: 10s         # 写入响应超时
+  idle_timeout: 120s         # 空闲连接超时
+
+# Redis 配置
+redis:
+  addr: "localhost:6379"     # Redis 地址
+  password: "redispassword"  # 密码（空字符串表示无密码）
+  db: 0                      # 数据库编号
+  pool_size: 10             # 连接池大小
+  min_idle_conns: 5         # 最小空闲连接数
+
+# 执行器配置
+executor:
+  pool_num: 10               # 并发 worker 数量
+
+# 时间轮配置
+wheel:
+  layers:
+    - tick_count: 60
+      tick_duration: 1s      # 第 1 层：1分钟跨度
+    - tick_count: 60
+      tick_duration: 1m      # 第 2 层：1小时跨度
+    - tick_count: 24
+      tick_duration: 1h      # 第 3 层：1天跨度
+
+# 调度器配置
+scheduler:
+  retry_interval: 5s         # 重试间隔
+
+# 日志配置
+logger:
+  level: "info"             # 日志级别：debug, info, warn, error
+  path: "logs/delay-queue.log"  # 日志文件路径
+  max_size: 100              # 单文件最大大小（MB）
+  max_age: 7                 # 保留天数
+  max_backups: 30            # 保留备份数
+```
+
+### 配置项说明
+
+| 配置项 | 默认值 | 说明 |
+|-------|--------|------|
+| `http.addr` | `:8088` | HTTP 服务监听地址 |
+| `http.read_timeout` | 5s | 读取请求头超时 |
+| `http.write_timeout` | 10s | 写入响应超时 |
+| `executor.pool_num` | 10 | 并发执行任务数 |
+| `scheduler.retry_interval` | 5s | 失败重试间隔 |
+| `logger.level` | info | 日志输出级别 |
+| `wheel.layers` | 3层 | 时间轮层级配置 |
+
+## 日志说明
+
+日志采用 JSON 格式输出，同时输出到控制台和文件：
+
+```json
+{"time":"2026-05-08T10:00:00Z","level":"INFO","msg":"Redis 连接成功","pong":"PONG"}
+{"time":"2026-05-08T10:00:01Z","level":"INFO","msg":"service starting","addr":":8088"}
+{"time":"2026-05-08T10:05:00Z","level":"INFO","msg":"task executed","task_id":"order-123","code":200}
+```
+
+日志文件自动轮转，避免单个文件过大。
 
 ## 业务场景示例
 
@@ -200,77 +284,23 @@ curl -X POST "http://localhost:8088/task/add" \
   -d "execute_at=${EXEC_AT}"
 ```
 
-## 配置说明
-
-### 修改端口
-
-编辑 `cmd/server/main.go`：
-
-```go
-http.ListenAndServe(":8088", nil)
-// 改为
-http.ListenAndServe(":9090", nil)
-```
-
-### 修改时间轮配置
-
-编辑 `cmd/server/main.go` 中的 `layers` 变量：
-
-```go
-layers := []wheel.LayerConfig{
-    {
-        TickDuration: time.Second,  // 第 1 层刻度
-        TickCount:    60,           // 第 1 层槽数
-    },
-    {
-        TickDuration: time.Minute,  // 第 2 层刻度
-        TickCount:    60,           // 第 2 层槽数
-    },
-    {
-        TickDuration: time.Hour,    // 第 3 层刻度
-        TickCount:    24,           // 第 3 层槽数
-    },
-}
-```
-
-### 修改执行器并发数
-
-编辑 `cmd/server/main.go`：
-
-```go
-sched.Executor = executor.NewExecutor(ctx, 10, &wg)
-// 改为（例如 50 个 worker）
-sched.Executor = executor.NewExecutor(ctx, 50, &wg)
-```
-
-### 修改重试次数
-
-在添加任务时指定 `MaxRetry`（当前默认 3 次）：
-
-API 暂不支持通过参数指定，可在 `internal/api/handler.go` 中修改默认行为。
-
 ## 扩展计划
 
-### 持久化存储
+### 已完成
 
-当前使用内存存储，任务仅保存在内存中。重启动服务后会丢失。
+- [x] Redis 持久化存储
+- [x] 配置文件支持
+- [x] 结构化日志
+- [x] 日志轮转
 
-后续计划支持：
+### 待实现
 
-- Redis 存储：适用于分布式部署场景
-- MySQL 存储：适用于需要持久化保留任务的场景
-
-### 分布式支持
-
-- 多实例部署
-- 任务分片
-- 主从选举
-
-### 监控指标
-
-- 任务执行成功率
-- 平均执行延迟
-- 队列积压数量
+- [ ] 任务查询 API（根据 ID 查询任务状态）
+- [ ] 任务取消 API（取消待执行任务）
+- [ ] 任务删除 API（删除已完成任务）
+- [ ] 任务清理机制（自动清理过期任务）
+- [ ] 监控指标（成功率、延迟、积压数量）
+- [ ] 分布式支持（多实例部署、任务分片）
 
 ## 运行测试
 
