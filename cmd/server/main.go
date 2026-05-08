@@ -9,7 +9,6 @@ import (
 	"feng/delay-queue/internal/scheduler"
 	"feng/delay-queue/internal/store"
 	"feng/delay-queue/internal/wheel"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,7 +18,7 @@ import (
 
 func main() {
 	if err := config.InitConfig(); err != nil {
-		panic(fmt.Sprintf("初始化配置失败: %v", err))
+		panic("初始化配置失败: " + err.Error())
 	}
 	cfg := config.GetConfig()
 
@@ -68,10 +67,16 @@ func main() {
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout,
 	}
+
 	go func() {
-		fmt.Print("service start!\n")
+		logger.Get().Info("service starting",
+			"addr", cfg.HTTP.Addr,
+		)
 		if err := server.ListenAndServe(); err != nil {
-			fmt.Println("server error:", err)
+			logger.Get().Error("service start fail!",
+				"addr", cfg.HTTP.Addr,
+				"error", err.Error(),
+			)
 		}
 	}()
 
@@ -79,8 +84,8 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
-	fmt.Printf("\n收到信号 %v，开始优雅退出...\n", sigCh)
+	logger.Get().Info("收到退出信号, 开始优雅退出...")
 	cancel()
 	wg.Wait()
-	fmt.Println("所有任务处理完毕，退出")
+	logger.Get().Info("所有任务处理完毕，退出")
 }

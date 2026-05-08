@@ -3,7 +3,6 @@ package executor
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"feng/delay-queue/internal/config"
 	"feng/delay-queue/internal/model"
 	"io"
@@ -73,8 +72,7 @@ func (e *Executor) execute(t *model.Task) {
 		Timeout: 5 * time.Second,
 	}
 
-	json, _ := json.Marshal(t.Payload)
-	reader := bytes.NewReader(json)
+	reader := bytes.NewReader([]byte(t.Payload))
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "POST", t.CallbackURL, reader)
