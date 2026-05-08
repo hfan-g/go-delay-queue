@@ -15,6 +15,7 @@ type Config struct {
 	Executor  ExecutorConfig  `yaml:"executor"`
 	Wheel     WheelConfig     `yaml:"wheel"`
 	Scheduler SchedulerConfig `yaml:"scheduler"`
+	Logger    LoggerConfig    `yaml:"logger"`
 }
 
 type HTTPConfig struct {
@@ -42,6 +43,14 @@ type WheelConfig struct {
 
 type SchedulerConfig struct {
 	RetryInterval time.Duration `yaml:"retry_interval"`
+}
+
+type LoggerConfig struct {
+	Level      string `yaml:"level"`
+	Path       string `yaml:"path"`
+	MaxSize    int    `yaml:"max_size"`
+	MaxAge     int    `yaml:"max_age"`
+	MaxBackups int    `yaml:"max_backups"`
 }
 
 var config *Config

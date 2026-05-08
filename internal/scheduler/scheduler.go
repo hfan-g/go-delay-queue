@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"feng/delay-queue/internal/executor"
+	"feng/delay-queue/internal/logger"
 	"feng/delay-queue/internal/model"
 	"feng/delay-queue/internal/store"
 	"feng/delay-queue/internal/wheel"
@@ -38,7 +39,9 @@ func (s *Scheduler) HandleExpiredTask(task wheel.ScheduleTask) {
 	fullTask, err := s.Store.GetTask(s.Ctx, id)
 	if err != nil {
 		fmt.Println(err)
-		fmt.Printf("gettask fail ID: %s", id)
+		logger.Get().Error("get task fail",
+			"id", id,
+		)
 		return
 	}
 
@@ -61,14 +64,20 @@ func (s *Scheduler) Result() {
 				}
 				if res.Code == http.StatusOK {
 					s.Store.UpdateStatus(s.Ctx, res.TaskId, model.StatusProcessing, model.StatusSuccess)
-					fmt.Printf("执行成功 ID: %s \n", res.TaskId)
+					logger.Get().Info("执行成功",
+						"id", res.TaskId,
+					)
 				} else {
-					fmt.Printf("执行失败！ ID: %s \n", res.TaskId)
-
+					logger.Get().Error("执行失败！",
+						"id", res.TaskId,
+					)
 					// 失败了查看重试次数, 如果超过了最大测试参数直接返回
 					t, err := s.Store.GetTask(s.Ctx, res.TaskId)
 					if err != nil {
-						fmt.Printf("获取任务失败！ ID: %s, err: %v\n", res.TaskId, err)
+						logger.Get().Error("获取任务失败",
+							"id", res.TaskId,
+							"error", err.Error(),
+						)
 						continue
 					}
 					if t.RetryCount >= t.MaxRetry {

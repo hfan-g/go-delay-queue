@@ -5,6 +5,7 @@ import (
 	"feng/delay-queue/internal/api"
 	"feng/delay-queue/internal/config"
 	"feng/delay-queue/internal/executor"
+	"feng/delay-queue/internal/logger"
 	"feng/delay-queue/internal/scheduler"
 	"feng/delay-queue/internal/store"
 	"feng/delay-queue/internal/wheel"
@@ -18,18 +19,26 @@ import (
 
 func main() {
 	if err := config.InitConfig(); err != nil {
-        panic(fmt.Sprintf("初始化配置失败: %v", err))
+		panic(fmt.Sprintf("初始化配置失败: %v", err))
 	}
 	cfg := config.GetConfig()
+
+	logger.Init(
+		cfg.Logger.Level,
+		cfg.Logger.Path,
+		cfg.Logger.MaxSize,
+		cfg.Logger.MaxAge,
+		cfg.Logger.MaxBackups,
+	)
 
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
 	store := store.NewRedisStore(&cfg.Redis)
 	sched := &scheduler.Scheduler{
-		Store: store,
-		Wg: &wg,
-		Ctx: ctx,
-		RetryInterval: cfg.Scheduler.RetryInterval,	
+		Store:         store,
+		Wg:            &wg,
+		Ctx:           ctx,
+		RetryInterval: cfg.Scheduler.RetryInterval,
 	}
 
 	// 定义回调

@@ -25,3 +25,9 @@ wheel:
 
 scheduler:
   retry_interval: 5s
+
+logger:
+  level: "info"
+  path: "logs/delay-queue.log"
+  max_size: 100
+  max_backups: 7

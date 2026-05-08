@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"feng/delay-queue/internal/config"
+	"feng/delay-queue/internal/logger"
 	"feng/delay-queue/internal/model"
 	"fmt"
 	"strconv"
@@ -34,7 +35,7 @@ func NewRedisStore(cfg *config.RedisConfig) *RedisStore {
 	if err != nil {
 		panic(fmt.Sprintf("Redis 连接失败: %v", err))
 	}
-	fmt.Println("Redis 连接成功:", pong)
+	logger.Get().Info("Redis 连接成功", "pong", pong)
 
 	return &RedisStore{
 		rdb: rdb,
@@ -121,7 +122,10 @@ func (r *RedisStore) GetReadyTasks(ctx context.Context) []*model.Task {
 		}
 		task, err := parseTaskHash(data)
 		if err != nil {
-			fmt.Printf("parseTaskHash id %s error: %v\n", id, err)
+			logger.Get().Error("redisStore parseTaskHash error",
+				"id", id,
+				"error", err.Error(),
+			)
 			continue
 		}
 		tasks = append(tasks, task)
@@ -134,7 +138,9 @@ func (r *RedisStore) GetProcessingTasks(ctx context.Context) []*model.Task {
 	key := taskStatusKey(int(model.StatusProcessing))
 	ids, err := r.rdb.SMembers(ctx, key).Result()
 	if err != nil {
-		fmt.Println("GetProcesingTasks fail")
+		logger.Get().Error("redisStore GetProcesingTasks smembers fail",
+			"error", err.Error(),
+		)
 		return []*model.Task{}
 	}
 
@@ -157,12 +163,18 @@ func (r *RedisStore) GetProcessingTasks(ctx context.Context) []*model.Task {
 	for i, id := range ids {
 		data, err := cmds[i].Result()
 		if err != nil {
-			fmt.Printf("id %s error: %v\n", id, err)
+			logger.Get().Error("redisStore GetProcessingTasks error",
+				"id", id,
+				"error", err.Error(),
+			)
 			continue
 		}
 		task, err := parseTaskHash(data)
 		if err != nil {
-			fmt.Printf("parseTaskHash id %s error: %v\n", id, err)
+			logger.Get().Error("redisStore parseTaskHash error",
+				"id", id,
+				"error", err.Error(),
+			)
 			continue
 		}
 		tasks = append(tasks, task)
@@ -206,10 +218,8 @@ func (r *RedisStore) UpdateStatus(ctx context.Context, id string, oldStatus mode
 	}
 
 	if result == 1 {
-		fmt.Printf("更新成功, 状态为 %d, id: %s\n", newStatus, id)
 		return nil
 	} else {
-		fmt.Printf("状态不为 %d, 新状态 %d id: %s 未更新\n", oldStatus, newStatus, id)
 		return fmt.Errorf("updateStatus error")
 	}
 }
@@ -258,10 +268,8 @@ func (r *RedisStore) RequeueTask(
 	}
 
 	if result == 1 {
-		fmt.Printf("更新成功, 状态为 %d, id: %s\n", newStatus, id)
 		return nil
 	} else {
-		fmt.Printf("状态不为 %d, 新状态 %d id: %s 未更新\n", oldStatus, newStatus, id)
 		return fmt.Errorf("updateStatus error")
 	}
 }

@@ -2,7 +2,7 @@ package wheel
 
 import (
 	"container/list"
-	"fmt"
+	"feng/delay-queue/internal/logger"
 	"sync"
 	"time"
 )
@@ -63,7 +63,9 @@ func (w *Wheel) addTask(task ScheduleTask) error {
 	if pos <= 0 {
 		return nil
 	}
-	fmt.Printf("插入id ID: %s \n", task.GetID())
+	logger.Get().Info("插入task成功",
+		"id", task.GetID(),
+	)
 	w.slots[pos].tasks.PushBack(task)
 
 	return nil
