@@ -57,12 +57,10 @@ func (tw *TimingWheel) Start() {
 func (tw *TimingWheel) tick() {
 	l0 := tw.wheelLayers[0]
 	slot := l0.slots[l0.currentPos]
-	for e := slot.tasks.Front(); e != nil; {
-		task := e.Value.(ScheduleTask)
+	tasks := slot.tasks
+	slot.tasks = nil
+	for _, task := range tasks {
 		tw.onTaskExpired(task)
-		next := e.Next()
-		slot.tasks.Remove(e)
-		e = next
 	}
 	l0.currentPos = (l0.currentPos + 1) % l0.tickCount
 	if l0.currentPos == 0 {
@@ -74,12 +72,10 @@ func (tw *TimingWheel) advance(layerIndex int) {
 	w := tw.wheelLayers[layerIndex]
 	w.currentPos = (w.currentPos + 1) % w.tickCount
 	slot := w.slots[w.currentPos]
-	for e := slot.tasks.Front(); e != nil; {
-		task := e.Value.(ScheduleTask)
+	tasks := slot.tasks
+	slot.tasks = nil
+	for _, task := range tasks {
 		tw.AddTask(task)
-		next := e.Next()
-		slot.tasks.Remove(e)
-		e = next
 	}
 	if w.currentPos == 0 && layerIndex+1 < len(tw.wheelLayers) {
 		tw.advance(layerIndex + 1)
@@ -101,7 +97,7 @@ func (tw *TimingWheel) addTask(task ScheduleTask) error {
 		if delay < wheel.totalSpan() {
 			steps := int(delay / wheel.tickDuration)
 			pos := (wheel.currentPos + steps) % wheel.tickCount
-			wheel.slots[pos].tasks.PushBack(task)
+			wheel.slots[pos].tasks = append(wheel.slots[pos].tasks, task)
 			return nil
 		}
 	}

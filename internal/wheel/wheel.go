@@ -1,7 +1,6 @@
 package wheel
 
 import (
-	"container/list"
 	"time"
 )
 
@@ -14,7 +13,7 @@ type ScheduleTask interface {
 
 // slot 时间轮的单个槽位
 type slot struct {
-	tasks *list.List
+	tasks []ScheduleTask
 }
 
 type Wheel struct {
@@ -33,7 +32,7 @@ func NewWheel(tickDuration time.Duration, tickCount int) *Wheel {
 	}
 
 	for i := 0; i < tickCount; i++ {
-		w.slots[i] = &slot{tasks: list.New()}
+		w.slots[i] = &slot{tasks: []ScheduleTask{}}
 	}
 	return w
 }
