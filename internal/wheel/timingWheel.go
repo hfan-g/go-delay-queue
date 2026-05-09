@@ -27,7 +27,7 @@ func NewTimingWheel(ctx context.Context, layers []LayerConfig, callback func(tas
 	}
 	tw.ticker = time.NewTicker(layers[0].TickDuration)
 	for _, layer := range layers {
-		tw.wheelLayers = append(tw.wheelLayers, NewWheel(layer.TickDuration, layer.TickCount, callback))
+		tw.wheelLayers = append(tw.wheelLayers, NewWheel(layer.TickDuration, layer.TickCount))
 	}
 	return tw
 }
@@ -59,7 +59,7 @@ func (tw *TimingWheel) tick() {
 	slot := l0.slots[l0.currentPos]
 	for e := slot.tasks.Front(); e != nil; {
 		task := e.Value.(ScheduleTask)
-		l0.onTaskExpired(task)
+		tw.onTaskExpired(task)
 		next := e.Next()
 		slot.tasks.Remove(e)
 		e = next

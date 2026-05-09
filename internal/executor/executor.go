@@ -36,7 +36,7 @@ func NewExecutor(ctx context.Context, cfg *config.ExecutorConfig, wg *sync.WaitG
 	}
 }
 
-func (e *Executor) Sublimt(t *model.Task) error {
+func (e *Executor) Submit(t *model.Task) error {
 	e.taskChan <- t
 	return nil
 }

@@ -2,8 +2,6 @@ package wheel
 
 import (
 	"container/list"
-	"feng/delay-queue/internal/logger"
-	"sync"
 	"time"
 )
 
@@ -24,19 +22,14 @@ type Wheel struct {
 	tickCount     int
 	slots         []*slot
 	currentPos    int
-	addTaskChan   chan ScheduleTask
-	wg            sync.WaitGroup
-	onTaskExpired func(task ScheduleTask)
 }
 
-func NewWheel(tickDuration time.Duration, tickCount int, callback func(ScheduleTask)) *Wheel {
+func NewWheel(tickDuration time.Duration, tickCount int) *Wheel {
 	w := &Wheel{
 		tickDuration:  tickDuration,
 		tickCount:     tickCount,
 		slots:         make([]*slot, tickCount),
 		currentPos:    0,
-		addTaskChan:   make(chan ScheduleTask, 1024),
-		onTaskExpired: callback,
 	}
 
 	for i := 0; i < tickCount; i++ {
@@ -45,56 +38,6 @@ func NewWheel(tickDuration time.Duration, tickCount int, callback func(ScheduleT
 	return w
 }
 
-// 计算任务应放在哪个槽位
-func (w *Wheel) getPosition(executeAt time.Time) int {
-	delay := time.Until(executeAt)
-	// 圈数逻辑简化：只讨论单层轮，让多层轮去管长延时
-	setps := int(delay / w.tickDuration)
-	return (w.currentPos + setps) % w.tickCount
-}
-
-func (w *Wheel) AddTask(task ScheduleTask) error {
-	w.addTaskChan <- task
-	return nil
-}
-
-func (w *Wheel) addTask(task ScheduleTask) error {
-	pos := w.getPosition(task.GetExecuteAt())
-	if pos <= 0 {
-		return nil
-	}
-	logger.Get().Info("插入task成功",
-		"id", task.GetID(),
-	)
-	w.slots[pos].tasks.PushBack(task)
-
-	return nil
-}
-
 func (w *Wheel) totalSpan() time.Duration {
 	return w.tickDuration * time.Duration(w.tickCount)
-}
-
-func (w *Wheel) Start() {
-	ticker := time.NewTicker(w.tickDuration)
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
-		for {
-			select {
-			case <-ticker.C:
-				slot := w.slots[w.currentPos]
-				for e := slot.tasks.Front(); e != nil; {
-					task := e.Value.(ScheduleTask)
-					w.onTaskExpired(task)
-					next := e.Next()
-					slot.tasks.Remove(e)
-					e = next
-				}
-				w.currentPos = (w.currentPos + 1) % w.tickCount
-			case task := <-w.addTaskChan:
-				w.addTask(task)
-			}
-		}
-	}()
 }

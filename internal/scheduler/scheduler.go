@@ -15,7 +15,6 @@ import (
 
 type Scheduler struct {
 	Store         store.Store
-	Tw            *wheel.Wheel
 	TimW          *wheel.TimingWheel
 	Executor      *executor.Executor
 	Wg            *sync.WaitGroup
@@ -48,7 +47,7 @@ func (s *Scheduler) HandleExpiredTask(task wheel.ScheduleTask) {
 		return
 	}
 
-	s.Executor.Sublimt(fullTask)
+	s.Executor.Submit(fullTask)
 }
 
 func (s *Scheduler) Result() {
