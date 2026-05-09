@@ -43,6 +43,11 @@ func (s *Scheduler) HandleExpiredTask(task wheel.ScheduleTask) {
 		return
 	}
 
+	// 幂等检查: 只有 Ready 状态才执行
+	if fullTask.Status != model.StatusReady {
+		return
+	}
+
 	if err := s.Store.UpdateStatus(s.Ctx, fullTask.ID, model.StatusReady, model.StatusProcessing); err != nil {
 		return
 	}
