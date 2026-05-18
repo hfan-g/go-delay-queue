@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
-          cache: true   # 如果还报错，改为 false 试一次
+          cache: false   # 如果还报错，改为 false 试一次
 
       - name: Clean cache (prevent dirty state)
         run: go clean -cache -modcache -testcache
