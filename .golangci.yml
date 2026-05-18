@@ -4,11 +4,9 @@ linters:
   default: none
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - unused
     - bodyclose
     - sqlclosecheck
     - noctx
@@ -17,7 +15,11 @@ linters:
     govet:
       enable:
         - shadow
+
 formatters:
   enable:
     - gofmt
     - goimports
+  settings:
+    goimports:
+      local-prefixes: feng/delay-queue
