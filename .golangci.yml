@@ -1,7 +1,7 @@
 version: "2"
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - gofmt
     - goimports
@@ -15,11 +15,7 @@ linters:
     - sqlclosecheck
     - noctx
     - gosec
-
-linters-settings:
-  govet:
-    enable:
-      - shadow
-  goimports:
-    # 把本地包归为一组，避免混在第三方包里
-    local-prefixes: github.com/your/project
+  settings:
+    govet:
+      enable:
+        - shadow
