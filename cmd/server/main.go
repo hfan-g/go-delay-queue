@@ -87,5 +87,6 @@ func main() {
 	logger.Get().Info("收到退出信号, 开始优雅退出...")
 	cancel()
 	wg.Wait()
+	store.Close()
 	logger.Get().Info("所有任务处理完毕，退出")
 }

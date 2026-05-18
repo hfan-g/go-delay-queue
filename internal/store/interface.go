@@ -13,4 +13,5 @@ type Store interface {
 	GetProcessingTasks(ctx context.Context, ) []*model.Task
 	UpdateStatus(ctx context.Context, id string, oldStatus model.TaskStatus, newStatus model.TaskStatus) error
 	RequeueTask(ctx context.Context, id string, oldStatus model.TaskStatus, newStatus model.TaskStatus, newExecAt time.Time, newRetryCount int) error
+	Close() error
 }

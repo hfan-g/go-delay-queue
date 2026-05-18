@@ -280,6 +280,10 @@ func (r *RedisStore) RequeueTask(
 	}
 }
 
+func (r *RedisStore) Close() error {
+	return r.rdb.Close()
+}
+
 func taskHashKey(id string) string {
 	return taskHashKeyPrefix + id
 }

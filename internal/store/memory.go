@@ -84,3 +84,7 @@ func (s *MemoryStore) RequeueTask(
 
 	return nil
 }
+
+func (s *MemoryStore) Close() error {
+	return nil
+}
