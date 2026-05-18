@@ -7,13 +7,27 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true   # 替代手动 actions/cache
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.0.0   # 与 .golangci.yml 的 version: "2" 匹配，可按需调整
+          args: --timeout=5m
+
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.25']
-
+    needs: lint
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,11 +35,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: '1.25'
           cache: true
 
-      - name: Clean cache (prevent dirty state)
-        run: go clean -cache -modcache -testcache
+      - name: Clean build & test cache
+        run: go clean -cache -testcache   # 保留模块缓存
 
       - name: Download dependencies
         run: go mod download
@@ -36,8 +50,8 @@ jobs:
       - name: Test
         run: go test -v -race -coverprofile=coverage.out ./...
 
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
         with:
-          name: coverage-${{ matrix.go-version }}
-          path: coverage.out
+          file: coverage.out
+          token: ${{ secrets.CODECOV_TOKEN }}   # 按需保留
