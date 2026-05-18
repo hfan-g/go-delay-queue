@@ -22,4 +22,5 @@ formatters:
     - goimports
   settings:
     goimports:
-      local-prefixes: feng/delay-queue
+      local-prefixes:
+        - feng/delay-queue
