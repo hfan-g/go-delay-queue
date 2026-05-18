@@ -21,7 +21,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.0.0   # 与 .golangci.yml 的 version: "2" 匹配，可按需调整
+          version: v2.1.0   # 与 .golangci.yml 的 version: "2" 匹配，可按需调整
           args: --timeout=5m
 
   build-and-test:
