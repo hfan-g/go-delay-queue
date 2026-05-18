@@ -3,8 +3,6 @@ version: "2"
 linters:
   default: none
   enable:
-    - gofmt
-    - goimports
     - errcheck
     - gosimple
     - govet
@@ -19,3 +17,7 @@ linters:
     govet:
       enable:
         - shadow
+formatters:
+  enable:
+    - gofmt
+    - goimports
