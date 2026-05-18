@@ -2,9 +2,9 @@ name: Go CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test:
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: [ '1.22', '1.23' ]   # 可测试多个 Go 版本
+        go-version: ['1.23', '1.24']   # 使用实际存在的大版本
 
     steps:
       - name: Checkout code
@@ -22,7 +22,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
-          cache: true                     # 自动缓存 Go 模块
+          cache: true   # 如果还报错，改为 false 试一次
+
+      - name: Clean cache (prevent dirty state)
+        run: go clean -cache -modcache -testcache
 
       - name: Download dependencies
         run: go mod download
@@ -33,7 +36,7 @@ jobs:
       - name: Test
         run: go test -v -race -coverprofile=coverage.out ./...
 
-      - name: Upload coverage (optional)
+      - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.go-version }}
