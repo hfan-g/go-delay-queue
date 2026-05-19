@@ -2,9 +2,10 @@ package wheel
 
 import (
 	"context"
-	"feng/delay-queue/internal/logger"
 	"fmt"
 	"time"
+
+	"feng/delay-queue/internal/logger"
 )
 
 type LayerConfig struct {
@@ -45,7 +46,9 @@ func (tw *TimingWheel) Start() {
 			case <-tw.ticker.C:
 				tw.tick()
 			case task := <-tw.addTaskChan:
-				tw.addTask(task)
+				if err := tw.addTask(task); err != nil {
+					logger.Get().Error("addTask 失败", "error", err.Error())
+				}
 			case <-tw.ctx.Done():
 				close(tw.addTaskChan)
 				return
@@ -76,7 +79,7 @@ func (tw *TimingWheel) advance(layerIndex int) {
 	slot.tasks = nil
 	for _, task := range tasks {
 		if err := tw.AddTask(task); err != nil {
-			logger.Get().Error("advance AddTask error: " + err.Error(), "id", task.GetID())
+			logger.Get().Error("advance AddTask error: "+err.Error(), "id", task.GetID())
 		}
 	}
 	if w.currentPos == 0 && layerIndex+1 < len(tw.wheelLayers) {

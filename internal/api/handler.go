@@ -2,12 +2,14 @@ package api
 
 import (
 	"encoding/json"
-	"feng/delay-queue/internal/logger"
-	"feng/delay-queue/internal/model"
-	"feng/delay-queue/internal/scheduler"
+
 	"net/http"
 	"strconv"
 	"time"
+
+	"feng/delay-queue/internal/logger"
+	"feng/delay-queue/internal/model"
+	"feng/delay-queue/internal/scheduler"
 )
 
 type Handel struct {
@@ -59,7 +61,7 @@ func (h *Handel) AddTask(w http.ResponseWriter, r *http.Request) {
 
 	err = h.s.AddTask(r.Context(), &task)
 	if err != nil {
-		jsonResponse(w, http.StatusInternalServerError, "Failed to add task: " + err.Error(), nil)
+		jsonResponse(w, http.StatusInternalServerError, "Failed to add task: "+err.Error(), nil)
 		return
 	}
 

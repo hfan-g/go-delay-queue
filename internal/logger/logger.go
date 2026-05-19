@@ -8,7 +8,6 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-
 var logger *slog.Logger
 
 func Init(level string, path string, maxSize int, maxAge int, maxBackups int) {

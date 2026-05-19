@@ -2,6 +2,12 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+
 	"feng/delay-queue/internal/api"
 	"feng/delay-queue/internal/config"
 	"feng/delay-queue/internal/executor"
@@ -9,11 +15,6 @@ import (
 	"feng/delay-queue/internal/scheduler"
 	"feng/delay-queue/internal/store"
 	"feng/delay-queue/internal/wheel"
-	"net/http"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 )
 
 func main() {

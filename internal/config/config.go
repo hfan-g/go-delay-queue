@@ -1,10 +1,11 @@
 package config
 
 import (
-	"feng/delay-queue/internal/wheel"
 	"fmt"
 	"os"
 	"time"
+
+	"feng/delay-queue/internal/wheel"
 
 	"go.yaml.in/yaml/v2"
 )

@@ -2,15 +2,16 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"sync"
+	"time"
+
 	"feng/delay-queue/internal/executor"
 	"feng/delay-queue/internal/logger"
 	"feng/delay-queue/internal/model"
 	"feng/delay-queue/internal/store"
 	"feng/delay-queue/internal/wheel"
-	"fmt"
-	"net/http"
-	"sync"
-	"time"
 )
 
 type Scheduler struct {
@@ -57,7 +58,7 @@ func (s *Scheduler) HandleExpiredTask(task wheel.ScheduleTask) {
 	}
 
 	if err := s.Executor.Submit(fullTask); err != nil {
-		logger.Get().Error("HandleExpiredTask Submit error: " + err.Error(), "ID", fullTask.ID)
+		logger.Get().Error("HandleExpiredTask Submit error: "+err.Error(), "ID", fullTask.ID)
 	}
 }
 
@@ -93,13 +94,15 @@ func (s *Scheduler) Result() {
 					}
 					if t.RetryCount >= t.MaxRetry {
 						if err := s.Store.UpdateStatus(s.Ctx, res.TaskId, model.StatusProcessing, model.StatusDead); err != nil {
-							logger.Get().Error("UpdateStatus err: " + err.Error(), "id", res.TaskId)
+							logger.Get().Error("UpdateStatus err: "+err.Error(), "id", res.TaskId)
 						}
 						continue
 					}
 					t.ExecuteAt = time.Now().Add(s.RetryInterval)
 					t.RetryCount++
-					s.retryTask(t, t.ExecuteAt, t.RetryCount)
+					if err := s.retryTask(t, t.ExecuteAt, t.RetryCount); err != nil {
+						logger.Get().Error("retryTask 失败", "error", err.Error())
+					}
 				}
 			case <-s.Ctx.Done():
 				return
@@ -112,14 +115,14 @@ func (s *Scheduler) Recover() {
 	tasks := s.Store.GetProcessingTasks(s.Ctx)
 	for _, t := range tasks {
 		if err := s.TimW.AddTask(t); err != nil {
-			logger.Get().Error("advance AddTask error: " + err.Error(), "id", t.ID)
+			logger.Get().Error("advance AddTask error: "+err.Error(), "id", t.ID)
 		}
 	}
 
 	tasts := s.Store.GetReadyTasks(s.Ctx)
 	for _, t := range tasts {
 		if err := s.TimW.AddTask(t); err != nil {
-			logger.Get().Error("Recover AddTask error: " + err.Error(), "id", t.ID)
+			logger.Get().Error("Recover AddTask error: "+err.Error(), "id", t.ID)
 		}
 	}
 }

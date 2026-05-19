@@ -3,13 +3,14 @@ package executor
 import (
 	"bytes"
 	"context"
-	"feng/delay-queue/internal/config"
-	"feng/delay-queue/internal/logger"
-	"feng/delay-queue/internal/model"
 	"io"
 	"net/http"
 	"sync"
 	"time"
+
+	"feng/delay-queue/internal/config"
+	"feng/delay-queue/internal/logger"
+	"feng/delay-queue/internal/model"
 )
 
 type result struct {
@@ -33,7 +34,7 @@ func NewExecutor(ctx context.Context, cfg *config.ExecutorConfig, wg *sync.WaitG
 		resultChan: make(chan *result, 1024),
 		poolNum:    cfg.PoolNum,
 		wg:         wg,
-		ctx: ctx,
+		ctx:        ctx,
 	}
 }
 
@@ -93,7 +94,11 @@ func (e *Executor) execute(t *model.Task) {
 		return
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logger.Get().Error("关闭响应体失败", "error", closeErr.Error())
+		}
+	}()
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logger.Get().Error("Execute ReadAll error: " + err.Error())
