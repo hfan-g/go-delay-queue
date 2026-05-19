@@ -17,18 +17,18 @@ type slot struct {
 }
 
 type Wheel struct {
-	tickDuration  time.Duration
-	tickCount     int
-	slots         []*slot
-	currentPos    int
+	tickDuration time.Duration
+	tickCount    int
+	slots        []*slot
+	currentPos   int
 }
 
 func NewWheel(tickDuration time.Duration, tickCount int) *Wheel {
 	w := &Wheel{
-		tickDuration:  tickDuration,
-		tickCount:     tickCount,
-		slots:         make([]*slot, tickCount),
-		currentPos:    0,
+		tickDuration: tickDuration,
+		tickCount:    tickCount,
+		slots:        make([]*slot, tickCount),
+		currentPos:   0,
 	}
 
 	for i := 0; i < tickCount; i++ {

@@ -26,8 +26,12 @@ func (s *Scheduler) AddTask(ctx context.Context, t *model.Task) error {
 	if err := s.Store.CreateTask(ctx, t); err != nil {
 		return err
 	}
-	s.TimW.AddTask(t)
-	s.Store.UpdateStatus(ctx, t.ID, model.StatusPending, model.StatusReady)
+	if err := s.TimW.AddTask(t); err != nil {
+		return err
+	}
+	if err := s.Store.UpdateStatus(ctx, t.ID, model.StatusPending, model.StatusReady); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -52,7 +56,9 @@ func (s *Scheduler) HandleExpiredTask(task wheel.ScheduleTask) {
 		return
 	}
 
-	s.Executor.Submit(fullTask)
+	if err := s.Executor.Submit(fullTask); err != nil {
+		logger.Get().Error("HandleExpiredTask Submit error: " + err.Error(), "ID", fullTask.ID)
+	}
 }
 
 func (s *Scheduler) Result() {
@@ -66,7 +72,9 @@ func (s *Scheduler) Result() {
 					continue
 				}
 				if res.Code == http.StatusOK {
-					s.Store.UpdateStatus(s.Ctx, res.TaskId, model.StatusProcessing, model.StatusSuccess)
+					if err := s.Store.UpdateStatus(s.Ctx, res.TaskId, model.StatusProcessing, model.StatusSuccess); err != nil {
+						logger.Get().Error("执行成功，但是修改状态失败", "id", res.TaskId)
+					}
 					logger.Get().Info("执行成功",
 						"id", res.TaskId,
 					)
@@ -84,7 +92,9 @@ func (s *Scheduler) Result() {
 						continue
 					}
 					if t.RetryCount >= t.MaxRetry {
-						s.Store.UpdateStatus(s.Ctx, res.TaskId, model.StatusProcessing, model.StatusDead)
+						if err := s.Store.UpdateStatus(s.Ctx, res.TaskId, model.StatusProcessing, model.StatusDead); err != nil {
+							logger.Get().Error("UpdateStatus err: " + err.Error(), "id", res.TaskId)
+						}
 						continue
 					}
 					t.ExecuteAt = time.Now().Add(s.RetryInterval)
@@ -101,26 +111,31 @@ func (s *Scheduler) Result() {
 func (s *Scheduler) Recover() {
 	tasks := s.Store.GetProcessingTasks(s.Ctx)
 	for _, t := range tasks {
-		s.TimW.AddTask(t)
+		if err := s.TimW.AddTask(t); err != nil {
+			logger.Get().Error("advance AddTask error: " + err.Error(), "id", t.ID)
+		}
 	}
 
 	tasts := s.Store.GetReadyTasks(s.Ctx)
 	for _, t := range tasts {
-		s.TimW.AddTask(t)
+		if err := s.TimW.AddTask(t); err != nil {
+			logger.Get().Error("Recover AddTask error: " + err.Error(), "id", t.ID)
+		}
 	}
 }
 
 func (s *Scheduler) retryTask(t *model.Task, executeAt time.Time, retryCount int) error {
 	err := s.Store.RequeueTask(s.Ctx, t.ID, model.StatusProcessing, model.StatusPending, executeAt, retryCount)
 	if err != nil {
-		return fmt.Errorf("retry task fail, ID: %s", t.ID)
+		return fmt.Errorf("retry task fail, RequeueTask err: %s", err)
 	}
 
-	err = s.TimW.AddTask(t)
-	if err != nil {
-		return fmt.Errorf("retry task fail, err: %s", err)
+	if err = s.TimW.AddTask(t); err != nil {
+		return fmt.Errorf("retry task fail, AddTask err: %s", err)
 	}
-	s.Store.UpdateStatus(s.Ctx, t.ID, model.StatusPending, model.StatusReady)
+	if err = s.Store.UpdateStatus(s.Ctx, t.ID, model.StatusPending, model.StatusReady); err != nil {
+		return fmt.Errorf("retry task fail, updateStatus err: %s", err)
+	}
 
 	return nil
 }

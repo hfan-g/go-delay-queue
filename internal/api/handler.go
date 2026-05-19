@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"feng/delay-queue/internal/logger"
 	"feng/delay-queue/internal/model"
 	"feng/delay-queue/internal/scheduler"
 	"net/http"
@@ -75,5 +76,7 @@ func jsonResponse(w http.ResponseWriter, code int, message string, data interfac
 		Data:    data,
 	}
 
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Get().Error("jsonResponse error: " + err.Error())
+	}
 }

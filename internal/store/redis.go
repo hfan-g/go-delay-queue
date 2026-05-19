@@ -299,8 +299,9 @@ func parseTaskHash(raw map[string]string) (*model.Task, error) {
 	t.CallbackURL = raw["callback_url"]
 	t.Payload = raw["payload"]
 
+	var sec int64
 	if v, exists := raw["execute_at"]; exists {
-		sec, err := strconv.ParseInt(v, 10, 64)
+		sec, err = strconv.ParseInt(v, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("execute_at invalid : %w", err)
 		}

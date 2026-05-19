@@ -2,6 +2,7 @@ package wheel
 
 import (
 	"context"
+	"feng/delay-queue/internal/logger"
 	"fmt"
 	"time"
 )
@@ -16,14 +17,14 @@ type TimingWheel struct {
 	wheelLayers   []*Wheel
 	onTaskExpired func(task ScheduleTask)
 	addTaskChan   chan ScheduleTask
-	ctx context.Context
+	ctx           context.Context
 }
 
 func NewTimingWheel(ctx context.Context, layers []LayerConfig, callback func(task ScheduleTask)) *TimingWheel {
 	tw := &TimingWheel{
 		addTaskChan:   make(chan ScheduleTask, 1024),
 		onTaskExpired: callback,
-		ctx: ctx,
+		ctx:           ctx,
 	}
 	tw.ticker = time.NewTicker(layers[0].TickDuration)
 	for _, layer := range layers {
@@ -53,7 +54,6 @@ func (tw *TimingWheel) Start() {
 	}()
 }
 
-
 func (tw *TimingWheel) tick() {
 	l0 := tw.wheelLayers[0]
 	slot := l0.slots[l0.currentPos]
@@ -75,7 +75,9 @@ func (tw *TimingWheel) advance(layerIndex int) {
 	tasks := slot.tasks
 	slot.tasks = nil
 	for _, task := range tasks {
-		tw.AddTask(task)
+		if err := tw.AddTask(task); err != nil {
+			logger.Get().Error("advance AddTask error: " + err.Error(), "id", task.GetID())
+		}
 	}
 	if w.currentPos == 0 && layerIndex+1 < len(tw.wheelLayers) {
 		tw.advance(layerIndex + 1)

@@ -87,6 +87,8 @@ func main() {
 	logger.Get().Info("收到退出信号, 开始优雅退出...")
 	cancel()
 	wg.Wait()
-	store.Close()
+	if err := store.Close(); err != nil {
+		logger.Get().Error("关闭 Redis 连接失败")
+	}
 	logger.Get().Info("所有任务处理完毕，退出")
 }

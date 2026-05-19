@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"feng/delay-queue/internal/config"
+	"feng/delay-queue/internal/logger"
 	"feng/delay-queue/internal/model"
 	"io"
 	"net/http"
@@ -94,6 +95,10 @@ func (e *Executor) execute(t *model.Task) {
 
 	defer resp.Body.Close()
 	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Get().Error("Execute ReadAll error: " + err.Error())
+		content = []byte{}
+	}
 
 	e.resultChan <- &result{
 		TaskId:  t.ID,
