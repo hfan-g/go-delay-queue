@@ -61,6 +61,7 @@ func main() {
 
 	handels := api.NewHandel(sched)
 	http.HandleFunc("/task/add", handels.AddTask)
+	http.HandleFunc("/task/", handels.GetTask)
 
 	server := &http.Server{
 		Addr:         cfg.HTTP.Addr,

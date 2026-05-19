@@ -2,9 +2,9 @@ package api
 
 import (
 	"encoding/json"
-
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"feng/delay-queue/internal/logger"
@@ -65,7 +65,27 @@ func (h *Handel) AddTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonResponse(w, http.StatusOK, "Task added successfully", map[string]string{"task": task.ID})
+	jsonResponse(w, http.StatusOK, "success", map[string]string{"task": task.ID})
+}
+
+func (h *Handel) GetTask(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		jsonResponse(w, http.StatusMethodNotAllowed, "Method not allowed", nil)
+		return
+	}
+	path := r.URL.Path
+	id := strings.TrimPrefix(path, "/task/")
+	if id == "" {
+		jsonResponse(w, http.StatusBadRequest, "id 不能为空", nil)
+		return
+	}
+
+	task, err := h.s.Store.GetTask(r.Context(), id)
+	if err != nil {
+		jsonResponse(w, http.StatusNotFound, "任务不存在", nil)
+		return
+	}
+	jsonResponse(w, http.StatusOK, "success", task)
 }
 
 func jsonResponse(w http.ResponseWriter, code int, message string, data interface{}) {
