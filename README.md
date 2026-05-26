@@ -1,314 +1,64 @@
 # Delay Queue
 
-基于时间轮（Timing Wheel）的延迟任务队列系统，用于定时执行 HTTP 回调任务。
-
-## 功能特性
-
-- 多层时间轮实现，秒级刻度；默认配置下最长延迟约一天（可改 `layers` 扩大跨度）
-- 内置重试机制，支持可配置的最大重试次数
-- 工作池并发执行，提高任务处理吞吐量
-- 任务状态全生命周期管理
-- **Redis 持久化存储**，服务重启后任务不丢失
-- **结构化日志**（JSON 格式），支持日志轮转
-- **配置文件支持**，所有参数可通过 `conf.yaml` 配置
-
-## 技术栈
-
-- Go 1.25+
-- Redis (go-redis/v9)
-- 标准库 net/http
-- log/slog (Go 1.21+ 内置)
-- lumberjack (日志轮转)
+多层时间轮延迟队列，任务到期后通过 HTTP 回调通知业务方。
 
 ## 快速开始
 
-### 配置文件
-
-服务启动前，编辑 `conf.yaml` 配置 Redis 连接：
-
-```yaml
-redis:
-  addr: "localhost:6379"
-  password: "your-password"
-  db: 0
-  pool_size: 10
-  min_idle_conns: 5
-```
-
-### 运行服务
+编辑 `conf.yaml` 中的 Redis 连接信息，然后启动：
 
 ```bash
 go run cmd/server/main.go
 ```
 
-服务启动后监听 `:8088` 端口。
+服务监听 `:8088`。
 
 ### 添加任务
 
-`execute_at` 必须为 **Unix 秒级时间戳**（纯数字字符串），与服务端 `strconv.ParseInt` 解析一致。下面示例为「当前时间起 2 分钟后执行」（POSIX `date` + Bash 算术，macOS / Linux 均可）：
+`execute_at` 为 Unix 秒级时间戳：
 
 ```bash
 curl -X POST "http://localhost:8088/task/add" \
-  -d "id=order-123" \
-  -d "callback_url=http://example.com/callback" \
+  -d "id=order-cancel-123" \
+  -d "callback_url=http://api.example.com/order/cancel" \
   -d "payload={\"order_id\":123}" \
   -d "execute_at=$(( $(date +%s) + 120 ))"
 ```
 
-将人类可读的本地日期时间转为 Unix 秒后再填入 `execute_at`：
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| id | 是 | 任务唯一标识 |
+| callback_url | 是 | 回调地址（HTTP POST） |
+| payload | 是 | 透传参数 |
+| execute_at | 是 | 期望执行时刻的 Unix 秒时间戳 |
 
-- **macOS (BSD `date`)**：`date -j -f "%Y-%m-%d %H:%M:%S" "2026-05-01 10:00:00" "+%s"`
-- **Linux (GNU `date`)**：`date -d "2026-05-01 10:00:00" +%s`
+默认配置下延迟超过约 24 小时的任务会被拒绝。
 
-### 参数说明
+### 查询任务
 
-
-| 参数           | 必填  | 说明                                     |
-| ------------ | --- | -------------------------------------- |
-| id           | 是   | 任务唯一标识                                 |
-| callback_url | 是   | 回调地址（HTTP POST）                        |
-| payload      | 是   | 透传参数（JSON 字符串）                         |
-| execute_at   | 是   | 期望执行时刻的 **Unix 秒时间戳**（例如 `1746099600`） |
-
-
-当前时间轮配置下，**延迟超过约 24 小时**的任务在添加时会失败（见 `internal/wheel/timingWheel.go` 中对最大跨度的校验）。
-
-## 架构设计
-
-```mermaid
-flowchart TD
-    A[客户端] -->|HTTP POST| B(/task/add API)
-    B --> C{参数校验}
-    C -->|失败| D[返回错误]
-    C -->|成功| E[Scheduler]
-    E --> F[Redis Store]
-    E --> G[Timing Wheel]
-    G -->|等待到期| H{时间轮Tick}
-    H -->|到期| I[Executor Pool]
-    I -->|HTTP POST| J[Callback URL]
-    J -->|响应| K[结果处理]
-    K -->|成功| L[更新状态: Success]
-    K -->|失败| M{重试次数}
-    M -->|未超限| G[重新入队]
-    M -->|已超限| N[更新状态: Dead]
+```
+GET /task/{id}
 ```
 
-### 核心组件
+## 架构
 
+四个核心组件：
 
-| 组件          | 文件                              | 说明        |
-| ----------- | ------------------------------- | --------- |
-| API         | internal/api/handler.go         | HTTP 接口处理 |
-| Scheduler   | internal/scheduler/scheduler.go | 任务调度与重试逻辑 |
-| TimingWheel | internal/wheel/timingWheel.go   | 多层时间轮实现   |
-| Executor    | internal/executor/executor.go   | 工作池并发执行   |
-| RedisStore  | internal/store/redis.go        | Redis 持久化存储 |
-| Logger      | internal/logger/logger.go      | 结构化日志      |
+- **Scheduler** — 接收任务，写入 Redis 持久化，加入时间轮
+- **TimingWheel** — 三层时间轮（1s/60 槽 → 1m/60 槽 → 1h/24 槽），到期后通知 Scheduler
+- **Executor** — 固定数量 worker 池，并发执行 HTTP 回调
+- **RedisStore** — 基于 Hash + Set 存储任务数据和状态索引，Lua 脚本保证状态原子性
 
-## 任务状态流转
+执行失败会自动重试，重试耗尽后标记 Dead。
 
-```mermaid
-stateDiagram-v2
-    [*] --> Pending : 创建任务
-    Pending --> Ready : 加入时间轮
-    Ready --> Processing : 时间到期
-    Processing --> Success : HTTP 200
-    Processing --> Failure : HTTP 非200
-    Failure --> Pending : 重试(≤MaxRetry)
-    Failure --> Dead : 重试耗尽
-    Success --> [*]
-    Dead --> [*]
-```
+## 配置
 
-### 状态说明
-
-
-| 状态         | 值   | 说明          |
-| ---------- | --- | ----------- |
-| Pending    | 0   | 等待加入调度      |
-| Ready      | 1   | 已加入时间轮，等待执行 |
-| Processing | 2   | 执行中         |
-| Success    | 3   | 执行成功        |
-| Failure    | 4   | 执行失败（待重试）   |
-| Dead       | 5   | 重试耗尽，需人工处理  |
-
-## 时间轮原理
-
-系统采用三层时间轮设计：
-
-
-| 层级    | 刻度间隔 | 槽数  | 总跨度  |
-| ----- | ---- | --- | ---- |
-| 第 1 层 | 1 秒  | 60  | 1 分钟 |
-| 第 2 层 | 1 分钟 | 60  | 1 小时 |
-| 第 3 层 | 1 小时 | 24  | 1 天  |
-
-任务根据延迟时间自动分配到合适的层级：
-
-- 延迟 < 1 分钟：进入第 1 层
-- 1 分钟 ≤ 延迟 < 1 小时：进入第 2 层
-- 1 小时 ≤ 延迟 < 1 天：进入第 3 层
-
-系统会找到第一个 totalSpan 大于延迟时间的层级，将任务放入该层级。
-
-当低层级时间轮转一圈后，将任务晋升到高层级。
-
-## 配置文件说明
-
-所有配置通过 `conf.yaml` 管理：
-
-```yaml
-# HTTP 服务配置
-http:
-  addr: ":8088"              # 服务地址
-  read_timeout: 5s           # 读取请求超时
-  write_timeout: 10s         # 写入响应超时
-  idle_timeout: 120s         # 空闲连接超时
-
-# Redis 配置
-redis:
-  addr: "localhost:6379"     # Redis 地址
-  password: "redispassword"  # 密码（空字符串表示无密码）
-  db: 0                      # 数据库编号
-  pool_size: 10             # 连接池大小
-  min_idle_conns: 5         # 最小空闲连接数
-
-# 执行器配置
-executor:
-  pool_num: 10               # 并发 worker 数量
-
-# 时间轮配置
-wheel:
-  layers:
-    - tick_count: 60
-      tick_duration: 1s      # 第 1 层：1分钟跨度
-    - tick_count: 60
-      tick_duration: 1m      # 第 2 层：1小时跨度
-    - tick_count: 24
-      tick_duration: 1h      # 第 3 层：1天跨度
-
-# 调度器配置
-scheduler:
-  retry_interval: 5s         # 重试间隔
-
-# 日志配置
-logger:
-  level: "info"             # 日志级别：debug, info, warn, error
-  path: "logs/delay-queue.log"  # 日志文件路径
-  max_size: 100              # 单文件最大大小（MB）
-  max_age: 7                 # 保留天数
-  max_backups: 30            # 保留备份数
-```
-
-### 配置项说明
-
-| 配置项 | 默认值 | 说明 |
-|-------|--------|------|
-| `http.addr` | `:8088` | HTTP 服务监听地址 |
-| `http.read_timeout` | 5s | 读取请求头超时 |
-| `http.write_timeout` | 10s | 写入响应超时 |
-| `executor.pool_num` | 10 | 并发执行任务数 |
-| `scheduler.retry_interval` | 5s | 失败重试间隔 |
-| `logger.level` | info | 日志输出级别 |
-| `wheel.layers` | 3层 | 时间轮层级配置 |
-
-## 日志说明
-
-日志采用 JSON 格式输出，同时输出到控制台和文件：
-
-```json
-{"time":"2026-05-08T10:00:00Z","level":"INFO","msg":"Redis 连接成功","pong":"PONG"}
-{"time":"2026-05-08T10:00:01Z","level":"INFO","msg":"service starting","addr":":8088"}
-{"time":"2026-05-08T10:05:00Z","level":"INFO","msg":"task executed","task_id":"order-123","code":200}
-```
-
-日志文件自动轮转，避免单个文件过大。
-
-## 业务场景示例
-
-### 场景一：订单超时自动取消
-
-用户下单后 30 分钟未支付，自动取消订单。
-
-```bash
-curl -X POST "http://localhost:8088/task/add" \
-  -d "id=order-cancel-${order_id}" \
-  -d "callback_url=http://api.example.com/order/cancel" \
-  -d "payload={\"order_id\":12345}" \
-  -d "execute_at=$(( $(date +%s) + 30 * 60 ))"
-```
-
-### 场景二：支付超时关闭订单
-
-用户发起支付后 15 分钟未完成支付，关闭订单。
-
-```bash
-curl -X POST "http://localhost:8088/task/add" \
-  -d "id=payment-timeout-${order_id}" \
-  -d "callback_url=http://api.example.com/payment/close" \
-  -d "payload={\"order_id\":12345}" \
-  -d "execute_at=$(( $(date +%s) + 15 * 60 ))"
-```
-
-### 场景三：商品自动下架
-
-定时上架的商品，到期后自动下架（将「下架时刻」转为 Unix 秒；以下为 **2026-05-02 00:00:00** 本地时间）。
-
-```bash
-# macOS
-EXEC_AT=$(date -j -f "%Y-%m-%d %H:%M:%S" "2026-05-02 00:00:00" "+%s")
-# Linux（GNU date）
-# EXEC_AT=$(date -d "2026-05-02 00:00:00" +%s)
-
-curl -X POST "http://localhost:8088/task/add" \
-  -d "id=product-offline-${product_id}" \
-  -d "callback_url=http://api.example.com/product/offline" \
-  -d "payload={\"product_id\":67890}" \
-  -d "execute_at=${EXEC_AT}"
-```
-
-### 场景四：会员过期提醒
-
-在指定本地日期时间发送提醒（示例：**2026-05-29 09:00:00**）。
-
-```bash
-# macOS
-EXEC_AT=$(date -j -f "%Y-%m-%d %H:%M:%S" "2026-05-29 09:00:00" "+%s")
-# Linux（GNU date）
-# EXEC_AT=$(date -d "2026-05-29 09:00:00" +%s)
-
-curl -X POST "http://localhost:8088/task/add" \
-  -d "id=vip-reminder-${user_id}" \
-  -d "callback_url=http://api.example.com/vip/remind" \
-  -d "payload={\"user_id\":99999}" \
-  -d "execute_at=${EXEC_AT}"
-```
-
-## 扩展计划
-
-### 已完成
-
-- [x] Redis 持久化存储
-- [x] 配置文件支持
-- [x] 结构化日志
-- [x] 日志轮转
-- [x] 任务查询 API（根据 ID 查询任务）
-
-### 待实现
-
-- [ ] 任务取消 API（取消待执行任务）
-- [ ] 任务删除 API（删除已完成任务）
-- [ ] 任务清理机制（自动清理过期任务）
-- [ ] 监控指标（成功率、延迟、积压数量）
-- [ ] 分布式支持（多实例部署、任务分片）
+见 `conf.yaml`，yaml 注释中有各字段说明。
 
 ## 运行测试
 
 ```bash
 go test ./internal/... -v
 ```
-
-若仓库中尚无 `*_test.go`，上述命令会快速通过且无测试输出。
 
 ## License
 
