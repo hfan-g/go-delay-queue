@@ -26,6 +26,7 @@ type Executor struct {
 	poolNum    int
 	wg         *sync.WaitGroup
 	ctx        context.Context
+	client     *http.Client
 }
 
 func NewExecutor(ctx context.Context, cfg *config.ExecutorConfig, wg *sync.WaitGroup) *Executor {
@@ -35,6 +36,14 @@ func NewExecutor(ctx context.Context, cfg *config.ExecutorConfig, wg *sync.WaitG
 		poolNum:    cfg.PoolNum,
 		wg:         wg,
 		ctx:        ctx,
+		client: &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConns:        30,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     90 * time.Second,
+			},
+			Timeout: 5 * time.Second,
+		},
 	}
 }
 
@@ -70,10 +79,6 @@ func (e *Executor) worker() {
 }
 
 func (e *Executor) execute(t *model.Task) {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-
 	reader := bytes.NewReader([]byte(t.Payload))
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -86,7 +91,7 @@ func (e *Executor) execute(t *model.Task) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := e.client.Do(req)
 	if err != nil {
 		e.resultChan <- &result{
 			TaskId: t.ID,
